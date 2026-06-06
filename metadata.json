@@ -1,0 +1,11 @@
+{
+  "name": "SarcoForge",
+  "description": "Premium world-class fitness platform with AI coaching, nutrition, workout tracking, and gamification.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
