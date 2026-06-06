@@ -218,19 +218,17 @@ ${
 
       <div className="flex justify-between items-center mb-8 border-b border-zinc-800/80 pb-4">
         <div>
-          <span className="text-xs font-mono text-blue-400 uppercase tracking-widest">Étape {step} de 7</span>
+          <span className="text-xs font-mono text-blue-400 uppercase tracking-widest block">Étape {step} de 5</span>
           <h2 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2 mt-1">
             {step === 1 && <><User className="w-5 h-5 text-blue-500" /> Profil Personnel</>}
             {step === 2 && <><Zap className="w-5 h-5 text-blue-500" /> Ratios Biométriques</>}
             {step === 3 && <><Dumbbell className="w-5 h-5 text-blue-500" /> Objectifs & Fréquence</>}
             {step === 4 && <><Utensils className="w-5 h-5 text-blue-500" /> Nutrition & Santé</>}
             {step === 5 && <><MapPin className="w-5 h-5 text-green-500" /> Où t'entraînes-tu ?</>}
-            {step === 6 && <><Compass className="w-5 h-5 text-indigo-500" /> Équipement & Espace</>}
-            {step === 7 && <><DollarSign className="w-5 h-5 text-yellow-500" /> Budget & Contraintes</>}
           </h2>
         </div>
         <div className="flex gap-1">
-          {[1, 2, 3, 4, 5, 6, 7].map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <div
               key={s}
               className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -441,276 +439,124 @@ ${
 
         {/* STEP 5: LIEU D'ENTRAÎNEMENT */}
         {step === 5 && (
-          <div className="space-y-5 animate-fadeIn-fast">
-            <div>
-              <p className="text-zinc-400 text-sm mb-4">Où s'organisent principalement vos sessions physiques ? <span className="text-xs text-blue-500">(Sélection multiple possible)</span></p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  {
-                    id: "Salle complète",
-                    title: "Salle de sport complète",
-                    description: "Accès à toute la machinerie lourde & poulies",
-                    badge: "Accès complet",
-                    color: "border-blue-500/40 text-blue-400 bg-blue-950/10",
-                    icon: <Dumbbell className="w-5 h-5 text-blue-500" />
-                  },
-                  {
-                    id: "Home Gym",
-                    title: "Home Gym",
-                    description: "Entraînement avec configuration personnalisée",
-                    badge: "Option domicile",
-                    color: "border-green-500/40 text-green-400 bg-green-950/10",
-                    icon: <Home className="w-5 h-5 text-green-500" />
-                  },
-                  {
-                    id: "Extérieur / Parc",
-                    title: "Extérieur / Parc",
-                    description: "Street workout, calisthénie, grand air",
-                    badge: "Poids de corps",
-                    color: "border-amber-500/40 text-amber-400 bg-amber-950/10",
-                    icon: <Compass className="w-5 h-5 text-amber-500" />
-                  },
-                  {
-                    id: "Hôtel / Voyage",
-                    title: "Hôtel / Voyage",
-                    description: "Déplacements pro fréquents",
-                    badge: "Zéro matériel",
-                    color: "border-purple-500/40 text-purple-400 bg-purple-950/10",
-                    icon: <MapPin className="w-5 h-5 text-purple-500" />
-                  },
-                  {
-                    id: "Bureau / Travail",
-                    title: "Bureau / Travail",
-                    description: "Séances courtes ou express au bureau",
-                    badge: "Session Express",
-                    color: "border-pink-500/40 text-pink-400 bg-pink-950/10",
-                    icon: <Briefcase className="w-5 h-5 text-pink-400" />
-                  },
-                  {
-                    id: "Plusieurs lieux",
-                    title: "Plusieurs lieux",
-                    description: "Je combine partout selon le planning",
-                    badge: "Multi-lieu hybride",
-                    color: "border-indigo-500/40 text-indigo-400 bg-indigo-950/10",
-                    icon: <Activity className="w-5 h-5 text-indigo-400" />
-                  }
-                ].map((item) => {
-                  const isChecked = (formData.trainingLocations || []).includes(item.id);
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => toggleLocation(item.id)}
-                      className={`p-4 rounded-2xl border text-left flex flex-col justify-between h-40 transition-all ${
-                        isChecked 
-                          ? `${item.color} shadow-[0_0_15px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/40`
-                          : "bg-zinc-900/40 border-zinc-800 text-zinc-300 hover:border-zinc-700"
-                      }`}
-                    >
-                      <div className="flex justify-between items-start w-full">
+          <div className="space-y-5 animate-fadeIn-fast text-left text-white">
+            <div className="mb-4">
+              <h3 className="text-xl font-bold text-white tracking-tight">Où est-ce que tu t'entraînes ?</h3>
+              <p className="text-zinc-400 text-sm mt-1">On s'occupe du reste 💪 <span className="text-xs text-blue-500 font-mono ml-2">(Sélection multiple possible)</span></p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                {
+                  id: "Salle de sport",
+                  title: "Salle de sport",
+                  description: "Accès complet à tous les équipements",
+                  supposed: "Machines, haltères, barres",
+                  badge: "Accès complet",
+                  color: "border-blue-500/40 text-blue-400 bg-blue-950/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]",
+                  icon: <Dumbbell className="w-5 h-5 text-blue-500" />
+                },
+                {
+                  id: "Chez moi",
+                  title: "Chez moi",
+                  description: "À la maison, dans mon espace personnel",
+                  supposed: "Exercices adaptés, aucun équipement requis",
+                  badge: "Sans contrainte",
+                  color: "border-green-500/40 text-green-400 bg-green-950/10 shadow-[0_0_15px_rgba(16,185,129,0.15)]",
+                  icon: <Home className="w-5 h-5 text-green-500" />
+                },
+                {
+                  id: "Dehors / Parc",
+                  title: "Dehors / Parc",
+                  description: "Running, street workout, espaces verts",
+                  supposed: "Cardio, poids du corps, barres de parc",
+                  badge: "Poids de corps",
+                  color: "border-amber-500/40 text-amber-400 bg-amber-950/10 shadow-[0_0_15px_rgba(245,158,11,0.15)]",
+                  icon: <Compass className="w-5 h-5 text-amber-500" />
+                },
+                {
+                  id: "Hôtel / Voyage",
+                  title: "Hôtel / Voyage",
+                  description: "En déplacement, peu de place",
+                  supposed: "Séances express efficaces, chambre friendly",
+                  badge: "Nomade",
+                  color: "border-purple-500/40 text-purple-400 bg-purple-950/10 shadow-[0_0_15px_rgba(139,92,246,0.15)]",
+                  icon: <MapPin className="w-5 h-5 text-purple-500" />
+                },
+                {
+                  id: "Bureau / Travail",
+                  title: "Bureau / Travail",
+                  description: "Séances express pendant la journée",
+                  supposed: "10-20 minutes max, discret & silencieux",
+                  badge: "Express pro",
+                  color: "border-pink-500/40 text-pink-400 bg-pink-950/10 shadow-[0_0_15px_rgba(236,72,153,0.15)]",
+                  icon: <Briefcase className="w-5 h-5 text-pink-400" />
+                },
+                {
+                  id: "CrossFit / Box",
+                  title: "CrossFit / Box",
+                  description: "Entraînement fonctionnel haute intensité",
+                  supposed: "WOD, kettlebells, barre olympique",
+                  badge: "Intensité Max",
+                  color: "border-amber-500/40 text-yellow-400 bg-yellow-950/10 shadow-[0_0_15px_rgba(234,179,8,0.15)]",
+                  icon: <Zap className="w-5 h-5 text-yellow-500" />
+                },
+                {
+                  id: "Piscine",
+                  title: "Piscine",
+                  description: "Natation et exercices aquatiques",
+                  supposed: "Cardio natation, corps complet",
+                  badge: "Aquatique",
+                  color: "border-cyan-500/40 text-cyan-400 bg-cyan-950/10 shadow-[0_0_15px_rgba(6,182,212,0.15)]",
+                  icon: <Activity className="w-5 h-5 text-cyan-400" />
+                },
+                {
+                  id: "Plusieurs lieux",
+                  title: "Plusieurs lieux",
+                  description: "Je m'entraîne à différents endroits",
+                  supposed: "Programme flexible selon le jour",
+                  badge: "Hybride",
+                  color: "border-indigo-500/40 text-indigo-400 bg-indigo-950/10 shadow-[0_0_15px_rgba(99,102,241,0.15)]",
+                  icon: <MapPin className="w-5 h-5 text-indigo-400" />
+                }
+              ].map((item) => {
+                const isChecked = (formData.trainingLocations || []).includes(item.id);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => toggleLocation(item.id)}
+                    className={`group p-4 rounded-3xl border text-left flex flex-col justify-between h-44 transition-all duration-300 cursor-pointer ${
+                      isChecked 
+                        ? `${item.color} scale-[1.03] ring-2 ring-blue-500/50`
+                        : "bg-zinc-900/40 border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/60"
+                    }`}
+                  >
+                    <div className="flex justify-between items-center w-full">
+                      <div className="p-2 rounded-xl bg-zinc-950/60 group-hover:scale-110 transition-transform">
                         {item.icon}
-                        <span className="text-[10px] font-mono font-bold bg-zinc-950/80 px-2 py-0.5 rounded border border-zinc-800 text-zinc-400">{item.badge}</span>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-xs text-white uppercase tracking-wider block mt-4">{item.title}</h4>
-                        <p className="text-[11px] text-zinc-400 line-clamp-2 mt-1 font-sans">{item.description}</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-mono font-bold bg-zinc-950/80 px-2 py-0.5 rounded border border-zinc-850 text-zinc-400">{item.badge}</span>
+                        {isChecked && (
+                          <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center animate-pulse">
+                            <Check className="w-3 h-3 text-white stroke-[3.5]" />
+                          </div>
+                        )}
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-sm text-white group-hover:text-blue-400 transition-colors block mt-2">{item.title}</h4>
+                      <p className="text-[11px] text-zinc-400 line-clamp-2 mt-1 font-sans font-medium">{item.description}</p>
+                      <span className="text-[9px] font-mono text-zinc-500 block mt-2 border-t border-zinc-800/40 pt-1.5">&bull; {item.supposed}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          </div>
-        )}
-
-        {/* STEP 6: ÉQUIPEMENT DISPONIBLE */}
-        {step === 6 && (
-          <div className="space-y-5 animate-fadeIn-fast">
-            <p className="text-zinc-400 text-xs leading-relaxed">
-              Sélectionnez ci-dessous l'ensemble des équipements et l'espace que vous possédez. L'IA masquera automatiquement tout exercice impossible.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Box of items */}
-              <div className="bg-zinc-900/30 border border-zinc-850 p-4 rounded-2xl max-h-[300px] overflow-y-auto space-y-4 pr-3 scrollbar-thin">
-                
-                <span className="text-[10px] font-mono text-zinc-500 uppercase block tracking-widest border-b border-zinc-800 pb-1">POIDS LIBRES & MATÉRIEL</span>
-                <div className="grid grid-cols-1 gap-2.5">
-                  {[
-                    "Haltères fixes", "Haltères réglables", "Kettlebell", 
-                    "Barre de tractions", "TRX / Sangles", "Bandes élastiques légères", 
-                    "Bandes élastiques lourdes"
-                  ].map((eq) => {
-                    const isChecked = (formData.specificEquipment || []).includes(eq);
-                    return (
-                      <label key={eq} className="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleEquipment(eq)}
-                          className="rounded border-zinc-800 text-blue-500 focus:ring-blue-600 bg-zinc-950 accent-blue-500 w-4 h-4 cursor-pointer"
-                        />
-                        <span>{eq}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                <span className="text-[10px] font-mono text-zinc-500 uppercase block tracking-widest border-b border-zinc-800 pb-1 mt-4">STRUCTURES DE FORCE</span>
-                <div className="grid grid-cols-1 gap-2.5">
-                  {[
-                    "Banc réglable", "Rack à squat", "Cage à squat complète", 
-                    "Câbles / Poulies", "Roue abdominale"
-                  ].map((eq) => {
-                    const isChecked = (formData.specificEquipment || []).includes(eq);
-                    return (
-                      <label key={eq} className="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleEquipment(eq)}
-                          className="rounded border-zinc-800 text-blue-500 focus:ring-blue-600 bg-zinc-950 accent-blue-500 w-4 h-4 cursor-pointer"
-                        />
-                        <span>{eq}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                <span className="text-[10px] font-mono text-zinc-500 uppercase block tracking-widest border-b border-zinc-800 pb-1 mt-4">ACCESSOIRES & SOL</span>
-                <div className="grid grid-cols-1 gap-2.5">
-                  {[
-                    "Tapis de sol (yoga mat)", "Corde à sauter", "Anneaux de gym", "Swiss Ball"
-                  ].map((eq) => {
-                    const isChecked = (formData.specificEquipment || []).includes(eq);
-                    return (
-                      <label key={eq} className="flex items-center gap-2.5 text-xs text-zinc-300 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleEquipment(eq)}
-                          className="rounded border-zinc-800 text-blue-500 focus:ring-blue-600 bg-zinc-950 accent-blue-500 w-4 h-4 cursor-pointer"
-                        />
-                        <span>{eq}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Space Selection */}
-              <div className="space-y-4">
-                <span className="text-[10px] font-mono text-zinc-500 uppercase block tracking-widest">Espace disponible au sol</span>
-                
-                <div className="space-y-2.5">
-                  {[
-                    { id: "Très petit (moins de 2m²)", title: "Très petit (<2m²)", desc: "Idéal chambre d'hôtel ou bureau" },
-                    { id: "Petit (2-4m²)", title: "Petit (2-4m²)", desc: "Coin dédié dans une pièce" },
-                    { id: "Moyen (4-9m²)", title: "Moyen (4-9m²)", desc: "Une pièce ou garage dédié" },
-                    { id: "Grand (9m²+)", title: "Grand (9m²+)", desc: "Grand espace libre" }
-                  ].map((sp) => {
-                    const isSelected = formData.availableSpace === sp.id;
-                    return (
-                      <button
-                        key={sp.id}
-                        type="button"
-                        onClick={() => handleInputChange("availableSpace", sp.id)}
-                        className={`w-full text-left p-3.5 rounded-xl border text-xs flex justify-between items-center transition-all ${
-                          isSelected
-                            ? "bg-indigo-650/10 border-indigo-500/80 text-white shadow-md font-bold"
-                            : "bg-zinc-900/40 border-zinc-850 hover:bg-zinc-900/60 text-zinc-300"
-                        }`}
-                      >
-                        <div>
-                          <span className="block uppercase text-[10px] tracking-wide font-mono font-bold">{sp.title}</span>
-                          <span className="block text-[10px] font-normal text-zinc-400 mt-0.5 font-sans">{sp.desc}</span>
-                        </div>
-                        {isSelected && <Check className="w-4 h-4 text-indigo-400" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-          </div>
-        )}
-
-        {/* STEP 7: BUDGET & CONTRAINTES */}
-        {step === 7 && (
-          <div className="space-y-5 animate-fadeIn-fast">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Budget Option cards */}
-              <div className="space-y-3">
-                <span className="text-[10px] font-mono text-zinc-500 uppercase block tracking-wider">Combien pouvez-vous investir en matériel ?</span>
-                
-                {[
-                  "Pas de budget pour l'instant",
-                  "Petit budget (moins de 100€)",
-                  "Budget moyen (100€ - 500€)",
-                  "Bon budget (500€ - 2000€)",
-                  "Budget illimité"
-                ].map((bg) => {
-                  const isSelected = formData.equipmentBudget === bg;
-                  return (
-                    <button
-                      key={bg}
-                      type="button"
-                      onClick={() => handleInputChange("equipmentBudget", bg)}
-                      className={`w-full text-left py-2.5 px-4 rounded-xl border text-xs font-semibold flex justify-between items-center transition-all ${
-                        isSelected
-                          ? "bg-green-500/10 border-green-500/80 text-green-400 shadow-[0_0_12px_rgba(16,185,129,0.1)]"
-                          : "bg-zinc-900/50 border-zinc-850 hover:border-zinc-800 text-zinc-400"
-                      }`}
-                    >
-                      <span>{bg}</span>
-                      {isSelected && <Check className="w-4 h-4" />}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Physical Constraints */}
-              <div className="space-y-3">
-                <span className="text-[10px] font-mono text-zinc-500 uppercase block tracking-wider">Contraintes Particulières ?</span>
-                
-                <div className="space-y-2">
-                  {[
-                    "Bruit limité (Voisins / Appartement)",
-                    "Espace restreint (Doit replier ou ranger)",
-                    "Enfants à proximité à surveiller",
-                    "Pas de chaussures (Sol fragile ou parquet)"
-                  ].map((ct) => {
-                    const isChecked = (formData.constraints || []).includes(ct);
-                    return (
-                      <button
-                        key={ct}
-                        type="button"
-                        onClick={() => toggleConstraint(ct)}
-                        className={`w-full text-left p-3.5 rounded-xl border text-xs font-semibold flex justify-between items-center transition-all ${
-                          isChecked
-                            ? "bg-pink-500/10 border-pink-500/80 text-pink-400 shadow-[0_0_12px_rgba(236,72,153,0.1)]"
-                            : "bg-zinc-900/50 border-zinc-850 hover:border-zinc-800 text-zinc-400"
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          {ct.includes("Bruit") && <VolumeX className="w-4 h-4 text-pink-500" />}
-                          {ct.includes("Espace") && <Compass className="w-4 h-4 text-pink-500" />}
-                          {ct.includes("Enfants") && <Shield className="w-4 h-4 text-pink-500" />}
-                          {ct.includes("chaussures") && <Award className="w-4 h-4 text-pink-500" />}
-                          <span>{ct}</span>
-                        </span>
-                        {isChecked && <Check className="w-4 h-4" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
+            {(formData.trainingLocations || []).length === 0 && (
+              <p className="text-xs text-red-400 font-mono text-center mt-3 animate-pulse">Veuillez sélectionner au moins 1 lieu pour continuer.</p>
+            )}
           </div>
         )}
 
@@ -728,7 +574,7 @@ ${
             <div />
           )}
 
-          {step < 7 ? (
+          {step < 5 ? (
             <button
               type="button"
               onClick={nextStep}
@@ -739,7 +585,12 @@ ${
           ) : (
             <button
               type="submit"
-              className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-bold flex items-center gap-1.5 transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] cursor-pointer"
+              disabled={(formData.trainingLocations || []).length === 0}
+              className={`py-2.5 px-6 rounded-xl text-white text-sm font-bold flex items-center gap-1.5 transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] cursor-pointer ${
+                (formData.trainingLocations || []).length === 0 
+                  ? "bg-zinc-800 text-zinc-500 opacity-50 cursor-not-allowed" 
+                  : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500"
+              }`}
             >
               Générer mon programme adapté <Sparkles className="w-4 h-4 text-yellow-300" />
             </button>

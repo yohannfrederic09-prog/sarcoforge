@@ -6,7 +6,7 @@ import {
   Dumbbell, Clock, Flame, Award, ChevronDown, ChevronUp, Camera, Video, 
   Volume2, VolumeX, Activity, AlertTriangle, ShieldCheck, PlayCircle, StopCircle, 
   Loader2, ThumbsUp, Sparkles, RefreshCw, ShoppingBag, MapPin, ShieldAlert, Check,
-  Zap
+  Zap, Home, Compass, Briefcase
 } from "lucide-react";
 
 interface WorkoutTrackerProps {
@@ -1091,6 +1091,102 @@ export default function WorkoutTracker({
       {/* Routine Tracker Form */}
       <div className="lg:col-span-7 space-y-6">
         
+        {/* V6.0 RAPID LOCATION SWITCHER & EQUIPMENT REFINEMENT */}
+        <div className="bg-zinc-950/60 border border-zinc-800/80 p-5 rounded-3xl space-y-4 backdrop-blur-md">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+            <div>
+              <span className="text-[10px] font-mono text-blue-400 uppercase tracking-widest block">Ajustement Géolocalisé Instantané</span>
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider mt-0.5 font-sans">Tu t'entraînes où aujourd'hui ?</h3>
+            </div>
+            <span className="text-[10px] font-mono text-zinc-500">Adapte instantanément la séance</span>
+          </div>
+
+          {/* 8 locations list */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { id: "Salle de sport", label: "Salle de sport", icon: <Dumbbell className="w-3.5 h-3.5" /> },
+              { id: "Chez moi", label: "Chez moi", icon: <Home className="w-3.5 h-3.5" /> },
+              { id: "Dehors / Parc", label: "Dehors / Parc", icon: <Compass className="w-3.5 h-3.5" /> },
+              { id: "Hôtel / Voyage", label: "Hôtel", icon: <MapPin className="w-3.5 h-3.5" /> },
+              { id: "Bureau / Travail", label: "Bureau", icon: <Briefcase className="w-3.5 h-3.5" /> },
+              { id: "CrossFit / Box", label: "CrossFit Box", icon: <Zap className="w-3.5 h-3.5" /> },
+              { id: "Piscine", label: "Piscine", icon: <Activity className="w-3.5 h-3.5" /> },
+              { id: "Plusieurs lieux", label: "Multi-lieux", icon: <MapPin className="w-3.5 h-3.5" /> },
+            ].map((loc) => {
+              const isSelected = activeLocation === loc.id;
+              return (
+                <button
+                  key={loc.id}
+                  onClick={() => {
+                    setActiveLocation(loc.id);
+                    // Generate minor feedback toast
+                    setBonusXpAlert(`📍 Lieu d'entraînement mis à jour : "${loc.id}" ! Programme et compatibilités ajustés.`);
+                    setTimeout(() => setBonusXpAlert(null), 3000);
+                  }}
+                  className={`py-2.5 px-3 rounded-2xl border text-left text-xs flex items-center gap-2 transition-all duration-300 cursor-pointer ${
+                    isSelected 
+                      ? "bg-blue-600/10 border-blue-500/50 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.15)] glow-md" 
+                      : "bg-zinc-900/40 border-zinc-850 hover:border-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  {loc.icon}
+                  <span className="font-semibold">{loc.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Dynamic Post-Selection Equipment Checklist for Chez moi as per V6.0 */}
+          {activeLocation === "Chez moi" && (
+            <div className="bg-zinc-900/40 border border-zinc-850/60 p-4 rounded-2xl space-y-2.5 animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-green-400" />
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Tu as du matériel chez toi ?</h4>
+                  <p className="text-[10px] text-zinc-500">Coche ce que tu as sous la main pour affiner ton programme libre :</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-1 font-sans">
+                {[
+                  { label: "Haltères", value: "Haltères fixes", synonyms: ["Haltères fixes", "Haltères réglables"] },
+                  { label: "Barre de traction", value: "Barre de tractions", synonyms: ["Barre de tractions"] },
+                  { label: "Bandes élastiques", value: "Bandes élastiques légères", synonyms: ["Bandes élastiques légères", "Bandes élastiques lourdes"] },
+                  { label: "Kettlebells", value: "Kettlebell", synonyms: ["Kettlebell"] },
+                ].map((item) => {
+                  const hasEquip = activeEquipment.includes(item.value);
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={() => {
+                        if (hasEquip) {
+                          // Remove all synonyms
+                          setActiveEquipment((prev) => prev.filter((eq) => !item.synonyms.includes(eq)));
+                          setBonusXpAlert(`⚙️ Matériel désactivé : "${item.label}".`);
+                        } else {
+                          // Add all synonyms
+                          setActiveEquipment((prev) => [...prev, ...item.synonyms]);
+                          setBonusXpAlert(`💪 Matériel activé : "${item.label}" + exercices débloqués !`);
+                        }
+                        setTimeout(() => setBonusXpAlert(null), 3000);
+                      }}
+                      className={`text-[11px] px-3.5 py-2 rounded-full border transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                        hasEquip 
+                          ? "bg-green-600/15 text-green-400 border-green-500/40" 
+                          : "bg-zinc-950 border-zinc-850 text-zinc-500 hover:text-zinc-400"
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      <span>{hasEquip ? "✓" : "+"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Workout session header */}
         <div className="bg-zinc-950/40 rounded-3xl border border-zinc-800 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 backdrop-blur-md relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-3xl rounded-full"></div>
