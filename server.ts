@@ -11,6 +11,9 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// Tell Express to trust reverse proxy headers (fixes express-rate-limit warnings on Cloud Run)
+app.set("trust proxy", 1);
+
 // Security: limit request payloads to prevent Denial of Service (DoS) attacks
 app.use(express.json({ limit: "10kb" }));
 
@@ -277,6 +280,72 @@ Basé sur votre profil (**${goal}** pour un poids de **${weight} kg**), avec vot
     // Internal audits logs, hide stack trace and API endpoint information from raw clients
     console.error("Error in nutrition API:", error);
     res.status(500).json({ error: "Une erreur interne s'est produite lors de la génération de vos recommandations." });
+  }
+});
+
+// Échauffement IA - MOBILITY ENGINE
+app.post("/api/warmup-generator", async (req, res) => {
+  try {
+    const { muscleGroup, durationMin, exercises } = req.body;
+
+    if (!muscleGroup) {
+      return res.status(400).json({ error: "Groupe musculaire cible requis pour concevoir l'échauffement." });
+    }
+
+    const sanitizedMuscleGroup = String(muscleGroup).trim().substring(0, 100);
+    const duration = isNaN(Number(durationMin)) ? 8 : Math.max(3, Math.min(30, Number(durationMin)));
+    const exercisesList = Array.isArray(exercises) ? exercises.slice(0, 10).map((ex: any) => String(ex).trim().substring(0, 150)) : [];
+
+    if (!ai) {
+      // High-quality deterministic fallback in French for warmup routine
+      const mockWarmup = `### ⚡ Routine d'Échauffement & Mobilité IA - **${sanitizedMuscleGroup}** (${duration} minutes)
+
+Voici votre protocole d'échauffement cinétique calibré en mode local. Il est conçu pour lubrifier vos articulations et réveiller le recrutement d'unités motrices.
+
+#### 1️⃣ Libération Myofasciale Générale (2 minutes)
+*   **Auto-massage / Rouleau ou Balle de massage** : Massez délicatement la zone des **${sanitizedMuscleGroup}** et les muscles stabilisateurs adjacents.
+*   *Objectif* : Inhiber le tonus protecteur excessif, augmenter la température locale et stimuler l'apport sanguin myofascial.
+*   *Tempo* : 30 secondes d'oscillation lente par point de déclenchement sensible.
+
+#### 2️⃣ Mobilisation Articulaire Dynamic Flow (3 minutes)
+*   **Mobilisation spécifique** : Effectuez des étirements dynamiques contrôlés sur l'ensemble de la chaîne cinétique ciblée.
+*   **Mouvement de référence 1** : *Rotations Articulaires Contrôlées (CARs)* - 5 révolutions lentes et ultra-stables des articulations sollicitées (Hanches si bas, Épaules si haut).
+*   **Mouvement de référence 2** : *The World's Greatest Stretch (Le plus grand étirement du monde)* - 5 répétitions lentes de chaque côté avec extension thoracique complète de 2s.
+
+#### 3️⃣ Potentiation Neuromusculaire & Activation (3 minutes)
+*   **Mouvement de pré-sollicitation** : Effectuez 2 séries légères de 15 répétitions au poids du corps ou à l'élastique pour le muscle cible.
+*   ${exercisesList.length > 0 ? `*   **Activation spécifique pour ${exercisesList[0]}** : Mouvement à vide complet en vous concentrant sur la connexion esprit-muscle (tempo excentrique très ralenti 4-1-1-0).` : `*   **Activation proprioceptive** : Contractions isométriques de 6 secondes de la sangle abdominale profonde (Gainage transverse).`}
+*   *Bénéfice* : Lubrification synoviale accrue de l'interligne articulaire, préparant les gaines nerveuses à recevoir une surcharge progressive élevée.
+
+*Activez votre clé API Gemini dans l'onglet des configurations pour débloquer de riches analyses biomécaniques personnalisées.*`;
+      return res.json({ text: mockWarmup });
+    }
+
+    const promptText = `
+    En tant que coach expert en biomécanique et préparation physique d'athlètes de force Elite, génère un protocole d'échauffement, de mobilité et de prévention articulaire complet au format Markdown.
+    - Groupe musculaire principal ciblé : ${sanitizedMuscleGroup}
+    - Durée de l'échauffement : ${duration} minutes
+    - Mouvements prévus dans la séance : ${exercisesList.join(", ") || "Non spécifiés"}
+
+    Le guide doit inclure les sections suivantes et être structuré avec des en-têtes markdown clairs (###, ####) :
+    1. **⚡ Analyse Biomécanique Cinétique** : Explique pourquoi l'échauffement de cette zone (${sanitizedMuscleGroup}) est crucial, quelles articulations critiques (ex. gléno-humérale, coxo-fémorale, fémoro-patellaire) vont être sollicitées, et l'importance d'une préparation pour les exercices prévus (${exercisesList.join(", ") || "charges axiales"}).
+    2. **🔥 Libération Myofasciale Ciblée** : Propose 1 exercice d'auto-massage d'élite (ex. rouleau en mousse ou balle lacrosse) avec consignes d'exécution précises et buts anatomiques.
+    3. **🌿 Mobilisation Articulaire Active (Mobilité)** : Explique et décris 2 mouvements de mobilité articulaire dynamique spécifiquement choisis pour lubrifier les leviers mécaniques de ${sanitizedMuscleGroup}.
+    4. **💪 Activation Neuromusculaire & Amorce Proprioceptive** : Décris 1 à 2 activations légères (élastiques guidés ou poids du corps contrôlé) pour optimiser le recrutement moteur de transition.
+    5. **🎯 Protocole de Montée en Charge Progressive** : Fournis des recommandations claires pour la montée en charge (Ramping) sur le premier exercice, afin d'élever la performance de force sans générer de fatigue résiduelle inutile.
+
+    Utilise un ton extrêmement professionnel, scientifique, encourageant et d'acier.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: promptText,
+    });
+
+    res.json({ text: response.text });
+  } catch (error: any) {
+    console.error("Error in warmup generator API:", error);
+    res.status(550).json({ error: "Une erreur interne s'est produite lors de la génération de l'échauffement." });
   }
 });
 

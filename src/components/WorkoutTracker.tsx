@@ -22,19 +22,104 @@ export default function WorkoutTracker({
 }: WorkoutTrackerProps) {
   
   // 1. Unified State synchronized with Global Onboarding on mount
-  const defaultLocations = onboardingData?.trainingLocations || ["Salle complète"];
+  const defaultLocations = onboardingData?.trainingLocations || ["Salle de sport commerciale"];
   const defaultEquipment = onboardingData?.specificEquipment || [
     "Haltères fixes", "Bandes élastiques légères", "Tapis de sol (yoga mat)"
   ];
   const defaultSpace = onboardingData?.availableSpace || "Moyen (4-9m²)";
   const defaultConstraints = onboardingData?.constraints || [];
 
-  const [activeLocation, setActiveLocation] = useState<string>(defaultLocations[0] || "Salle complète");
+  const [activeLocation, setActiveLocation] = useState<string>(defaultLocations[0] || "Salle de sport commerciale");
   const [activeEquipment, setActiveEquipment] = useState<string[]>(defaultEquipment);
   const [activeSpace, setActiveSpace] = useState<string>(defaultSpace);
   const [activeConstraints, setActiveConstraints] = useState<string[]>(defaultConstraints);
   const [purchaseLog, setPurchaseLog] = useState<string[]>([]);
+  const [selectedRoutineTab, setSelectedRoutineTab] = useState<"elite" | "custom">("elite");
   const [bonusXpAlert, setBonusXpAlert] = useState<string | null>(null);
+
+  // Échauffement IA module states
+  const [warmupMuscleGroup, setWarmupMuscleGroup] = useState<string>("Pectoraux");
+  const [warmupDuration, setWarmupDuration] = useState<number>(8);
+  const [warmupLoading, setWarmupLoading] = useState<boolean>(false);
+  const [warmupResult, setWarmupResult] = useState<string | null>(null);
+  const [warmupError, setWarmupError] = useState<string | null>(null);
+  const [showWarmupDetail, setShowWarmupDetail] = useState<boolean>(true); // True by default so users see results immediately
+
+  // States for 100% custom exercises forged on-the-fly
+  const [customExercises, setCustomExercises] = useState<PremiumExercise[]>(() => {
+    try {
+      const stored = localStorage.getItem("sarcoforge_custom_exercises");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [showCustomExerciseForm, setShowCustomExerciseForm] = useState(false);
+  const [customExerciseForm, setCustomExerciseForm] = useState({
+    name: "",
+    primaryMuscle: "Pectoraux",
+    difficulty: "Débutant" as "Débutant" | "Intermédiaire" | "Avancé",
+    equipment: "Aucun",
+    description: "",
+    tips: "",
+    commonMistakes: ""
+  });
+
+  const handleCreateCustomExercise = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customExerciseForm.name.trim()) return;
+
+    const newId = `custom_ex_${Date.now()}`;
+    const newEx: PremiumExercise = {
+      id: newId,
+      name: customExerciseForm.name,
+      description: customExerciseForm.description || "Un exercice personnalisé forgé par l'athlète.",
+      difficulty: customExerciseForm.difficulty,
+      primaryMuscle: customExerciseForm.primaryMuscle,
+      secondaryMuscles: [],
+      equipment: customExerciseForm.equipment,
+      instructions: [customExerciseForm.description || "Éléments d'exécution libres."],
+      tips: customExerciseForm.tips ? [customExerciseForm.tips] : ["Surchargez progressivement à chaque séance."],
+      commonMistakes: customExerciseForm.commonMistakes ? [customExerciseForm.commonMistakes] : ["Manque d'amplitude."],
+      isCustom: true,
+      emgActivation: 92,
+      riskRewardRatio: "Optimal",
+      minimum_space_required: "medium",
+      noise_level: "low"
+    };
+
+    const updated = [...customExercises, newEx];
+    setCustomExercises(updated);
+    localStorage.setItem("sarcoforge_custom_exercises", JSON.stringify(updated));
+
+    // Reset form
+    setCustomExerciseForm({
+      name: "",
+      primaryMuscle: "Pectoraux",
+      difficulty: "Débutant",
+      equipment: "Aucun",
+      description: "",
+      tips: "",
+      commonMistakes: ""
+    });
+    setShowCustomExerciseForm(false);
+    setBonusXpAlert(`🔥 Mouvement "${newEx.name}" forgé et ajouté à la bibliothèque avec succès !`);
+    setTimeout(() => setBonusXpAlert(null), 3000);
+  };
+
+  // State for user-defined reusable workout templates
+  const [customRoutines, setCustomRoutines] = useState<any[]>(() => {
+    try {
+      const stored = localStorage.getItem("sarcoforge_custom_routines");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Combine static and custom exercises
+  const mergedExercises = [...EXERCISE_DATABASE, ...customExercises];
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMuscleFilter, setSelectedMuscleFilter] = useState("Tous");
@@ -77,6 +162,99 @@ export default function WorkoutTracker({
     }
   }, [activeLocation, activeEquipment, activeSpace, activeConstraints]);
 
+  // Auto-detect the muscle targeted by the chosen workout session
+  useEffect(() => {
+    if (activeSession.logs.length > 0) {
+      // Find muscles worked in active session
+      const detectedMuscles = activeSession.logs.map((log) => {
+        const matchingEx = EXERCISE_DATABASE.find((e) => e.id === log.exerciseId);
+        return matchingEx ? matchingEx.primaryMuscle : null;
+      }).filter((m): m is string => m !== null);
+
+      if (detectedMuscles.length > 0) {
+        // Pre-select the primary muscle of the first active exercise as default
+        setWarmupMuscleGroup(detectedMuscles[0]);
+      }
+    }
+  }, [activeSession.logs.length]);
+
+  const generateAIWarmup = async () => {
+    setWarmupLoading(true);
+    setWarmupError(null);
+    setWarmupResult(null);
+
+    const activeExercises = activeSession.logs.map((log) => log.exerciseName);
+
+    try {
+      const response = await fetch("/api/warmup-generator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          muscleGroup: warmupMuscleGroup,
+          durationMin: warmupDuration,
+          exercises: activeExercises
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("L'évaluation cinétique de l'échauffement a échoué.");
+      }
+
+      const data = await response.json();
+      setWarmupResult(data.text);
+      setBonusXpAlert(`⚡ Échauffement Élite "${warmupMuscleGroup}" calibré ! +100 XP de Prévention Articulaire !`);
+      setTimeout(() => setBonusXpAlert(null), 4000);
+    } catch (err: any) {
+      console.error(err);
+      setWarmupError("Le serveur d'analyse biomécanique a mis trop de temps à répondre. Veuillez réessayer ou lancer en mode local.");
+    } finally {
+      setWarmupLoading(false);
+    }
+  };
+
+  const boldWarmupText = (text: string) => {
+    const parts = text.split(/\*\*([^*]+)\*\*/g);
+    if (parts.length === 1) return text;
+    return parts.map((part, i) => (i % 2 === 1 ? <strong key={i} className="text-white font-semibold">{part}</strong> : part));
+  };
+
+  const renderWarmupMarkdown = (text: string) => {
+    if (!text) return null;
+    const lines = text.split("\n");
+    return lines.map((line, idx) => {
+      if (line.startsWith("### ")) {
+        return <h4 key={idx} className="text-xs font-bold text-blue-400 mt-4 mb-2 first:mt-0 font-sans uppercase tracking-wider">{line.replace("### ", "")}</h4>;
+      }
+      if (line.startsWith("## ")) {
+        return <h3 key={idx} className="text-sm font-bold text-white mt-5 mb-2.5 first:mt-0 font-sans uppercase tracking-wider">{line.replace("## ", "")}</h3>;
+      }
+      if (line.startsWith("# ")) {
+        return <h2 key={idx} className="text-base font-bold text-white mt-6 mb-3 first:mt-0 font-sans uppercase tracking-wider">{line.replace("# ", "")}</h2>;
+      }
+      if (line.trim().startsWith("* ") || line.trim().startsWith("- ")) {
+        const cleanContent = line.replace(/^\s*[\*\-]\s+/, "");
+        return (
+          <li key={idx} className="ml-5 list-disc text-[11.5px] text-zinc-300 leading-relaxed mb-1.5 font-sans">
+            {boldWarmupText(cleanContent)}
+          </li>
+        );
+      }
+      if (/^\d+\.\s+/.test(line.trim())) {
+        const cleanContent = line.replace(/^\s*\d+\.\s+/, "");
+        const num = line.match(/^\s*(\d+)/)?.[0] || "1";
+        return (
+          <li key={idx} className="ml-5 list-decimal text-[11.5px] text-zinc-300 leading-relaxed mb-1.5 font-sans">
+            <span className="font-bold text-blue-400 mr-1">{num}.</span> {boldWarmupText(cleanContent)}
+          </li>
+        );
+      }
+      if (line.trim() === "") {
+        return <div key={idx} className="h-2.5" />;
+      }
+      return <p key={idx} className="text-[11.5px] text-zinc-300 leading-relaxed mb-2 font-sans">{boldWarmupText(line)}</p>;
+    });
+  };
+
   // Available muscles based on the newly expanded database
   const muscles = [
     "Tous", 
@@ -92,8 +270,8 @@ export default function WorkoutTracker({
 
   // 2. Real-time Compatibility Scoring algorithm
   const computeCompatibility = (ex: PremiumExercise) => {
-    // If location is full commercial gym, compatibility is 100% except for space/noise if strict
-    const isGym = activeLocation === "Salle complète";
+    // If location is full commercial gym, compatibility is 100%
+    const isGym = activeLocation === "Salle de sport commerciale" || activeLocation === "Salle complète";
     
     // Check if equipment is owned
     const required = ex.equipment_required || [];
@@ -133,8 +311,8 @@ export default function WorkoutTracker({
     return { score: 20, status: "Incompatible (Matériel manquant)", color: "text-red-400 bg-red-500/10 border-red-500/20" };
   };
 
-  // Safe exercise list builder with computed scores
-  const exercisesWithScores = EXERCISE_DATABASE.map(ex => {
+  // Safe exercise list builder with computed scores (using merged list)
+  const exercisesWithScores = mergedExercises.map(ex => {
     const premEx = ex as PremiumExercise;
     const compat = computeCompatibility(premEx);
     return {
@@ -156,7 +334,7 @@ export default function WorkoutTracker({
   // Dynamic on-the-fly replacement technique for bodyweight exercises (V4.0 Part 3)
   const swapWithBodyweightVersion = (exId: string) => {
     let alternateExId = "ex_pushup_standard"; // fallback
-    const originalEx = EXERCISE_DATABASE.find(e => e.id === exId);
+    const originalEx = mergedExercises.find(e => e.id === exId);
     if (!originalEx) return;
 
     if (originalEx.primaryMuscle === "Pectoraux") {
@@ -173,7 +351,7 @@ export default function WorkoutTracker({
       alternateExId = "ex_plank";
     }
 
-    const alternateEx = EXERCISE_DATABASE.find(e => e.id === alternateExId);
+    const alternateEx = mergedExercises.find(e => e.id === alternateExId);
     if (!alternateEx) {
       alert("La variante corps libre pour cet exercice n'a pas pu être géolocalisée. Essayez de l'ajouter manuellement.");
       return;
@@ -542,12 +720,12 @@ export default function WorkoutTracker({
   ];
 
   const loadPredefinedProgram = (progId: string) => {
-    const prog = ELITE_PROGRAMS.find(p => p.id === progId);
+    const prog = [...ELITE_PROGRAMS, ...customRoutines].find(p => p.id === progId);
     if (!prog) return;
 
     const newLogs: ExerciseLog[] = [];
     prog.exercises.forEach((progEx) => {
-      const dbEx = EXERCISE_DATABASE.find(e => e.id === progEx.id);
+      const dbEx = mergedExercises.find(e => e.id === progEx.id);
       if (!dbEx) return;
 
       const sets: SetRecord[] = [];
@@ -574,14 +752,52 @@ export default function WorkoutTracker({
 
     setActiveSession({
       id: `session_${Date.now()}`,
-      name: `🔥 ${prog.name}`,
+      name: prog.category === "Routine Personnalisée" ? prog.name : `🔥 ${prog.name}`,
       date: new Date().toLocaleDateString("fr-FR"),
       logs: newLogs,
       completed: false
     });
 
-    setBonusXpAlert(`⚙️ Programme d'Élite "${prog.name}" calibré à 100% dans votre routine ! En avant athlète !`);
+    setBonusXpAlert(`⚙️ Routine "${prog.name}" calibrée à 100% dans votre routine ! En avant athlète !`);
     setTimeout(() => setBonusXpAlert(null), 5000);
+  };
+
+  const handleSaveAsCustomRoutine = (routineName: string) => {
+    if (activeSession.logs.length === 0) {
+      alert("Ajoutez au moins un exercice avant de sauvegarder le modèle !");
+      return;
+    }
+    const finalName = routineName.trim() || `Routine Perso #${customRoutines.length + 1}`;
+    const newRoutine = {
+      id: `custom_prog_${Date.now()}`,
+      name: finalName,
+      category: "Routine Personnalisée",
+      frequency: "Libre",
+      description: `Créé sur-mesure d'après vos préférences de musculation.`,
+      exercises: activeSession.logs.map(log => ({
+        id: log.exerciseId,
+        sets_count: log.sets.length,
+        base_weight: log.sets[0]?.weight || 0,
+        base_reps: log.sets[0]?.reps || 10,
+        tempo: log.tempo || "3-0-1-0",
+        notes: log.notes || ""
+      }))
+    };
+
+    const updated = [...customRoutines, newRoutine];
+    setCustomRoutines(updated);
+    localStorage.setItem("sarcoforge_custom_routines", JSON.stringify(updated));
+    setBonusXpAlert(`✨ Le modèle de séance "${finalName}" a été sauvegardé dans vos routines !`);
+    setTimeout(() => setBonusXpAlert(null), 4000);
+  };
+
+  const handleDeleteCustomRoutine = (progId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent loading the routine when clicking delete
+    const updated = customRoutines.filter(p => p.id !== progId);
+    setCustomRoutines(updated);
+    localStorage.setItem("sarcoforge_custom_routines", JSON.stringify(updated));
+    setBonusXpAlert(`🗑️ Modèle de routine supprimé.`);
+    setTimeout(() => setBonusXpAlert(null), 3000);
   };
 
   return (
@@ -757,35 +973,94 @@ export default function WorkoutTracker({
         
         {/* ELITE ROUTINES BANNER PANEL (V4.0 Part 4) */}
         <div className="bg-gradient-to-b from-blue-950/20 to-zinc-950/80 border border-zinc-800 p-5 rounded-3xl space-y-3">
-          <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-blue-400" />
-            <div>
-              <span className="text-[10px] font-mono text-blue-400 uppercase block tracking-wider">Planification en 1 Clic</span>
-              <h3 className="text-xs font-black text-white uppercase mt-0.5">Programmes d'Élite V4.0</h3>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-blue-400" />
+              <div>
+                <span className="text-[10px] font-mono text-blue-400 uppercase block tracking-wider">Planification</span>
+                <h3 className="text-xs font-black text-white uppercase mt-0.5">Mes Routines & Programmes</h3>
+              </div>
+            </div>
+            
+            {/* Tab Swapper */}
+            <div className="flex gap-1 bg-zinc-900 border border-zinc-800 p-0.5 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setSelectedRoutineTab("elite")}
+                className={`text-[9px] uppercase font-mono px-2 py-1 rounded font-bold transition-all ${
+                  selectedRoutineTab !== "custom" ? "bg-zinc-855 text-white bg-zinc-800" : "text-zinc-550 hover:text-zinc-350"
+                }`}
+              >
+                Élite
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedRoutineTab("custom")}
+                className={`text-[9px] uppercase font-mono px-2 py-1 rounded font-bold transition-all ${
+                  selectedRoutineTab === "custom" ? "bg-zinc-855 text-white bg-zinc-800" : "text-zinc-550 hover:text-zinc-350"
+                }`}
+              >
+                Forgées ({customRoutines.length})
+              </button>
             </div>
           </div>
           
           <p className="text-[10px] text-zinc-400 leading-normal font-sans">
-            Sélectionnez l'une de nos configurations d'entraînement cultes d'athlète. Les volumes et charges se configurent de manière adaptative.
+            {selectedRoutineTab === "custom" 
+              ? "Accédez ou supprimez vos routines sur-mesure enregistrées à la Forge." 
+              : "Sélectionnez l'une de nos configurations d'entraînement cultes d'athlète. Les volumes se configurent de manière adaptative."}
           </p>
 
-          <div className="grid grid-cols-1 gap-2.5 pt-1.5">
-            {ELITE_PROGRAMS.map((prog) => (
-              <button
-                key={prog.id}
-                onClick={() => loadPredefinedProgram(prog.id)}
-                className="group w-full text-left bg-zinc-900/50 hover:bg-zinc-900 border border-zinc-850 hover:border-blue-500/40 p-3 rounded-2xl transition-all flex flex-col justify-between cursor-pointer"
-              >
-                <div className="flex justify-between items-start w-full">
-                  <div>
-                    <span className="text-[10.5px] font-bold text-white group-hover:text-blue-400 transition-colors block">{prog.name}</span>
-                    <span className="text-[9px] text-zinc-500 font-mono block mt-0.5">{prog.category} &bull; {prog.frequency}</span>
-                  </div>
-                  <span className="text-[8.5px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/15 px-1.5 py-0.5 rounded font-mono shrink-0 uppercase tracking-wider">Charger</span>
+          <div className="grid grid-cols-1 gap-2.5 pt-1.5 max-h-[300px] overflow-y-auto pr-1">
+            {selectedRoutineTab === "custom" ? (
+              customRoutines.length === 0 ? (
+                <div className="text-center py-6 text-zinc-650 font-mono text-[10px] border border-dashed border-zinc-850 rounded-2xl">
+                  Aucun modèle personnalisé.<br/>Sauvegardez votre séance active avec le bouton "Sauver en Modèle" à droite !
                 </div>
-                <p className="text-[9px] text-zinc-400 leading-normal mt-1.5 group-hover:text-zinc-300 font-sans">{prog.description}</p>
-              </button>
-            ))}
+              ) : (
+                customRoutines.map((prog) => (
+                  <div
+                    key={prog.id}
+                    onClick={() => loadPredefinedProgram(prog.id)}
+                    className="group w-full text-left bg-zinc-900/50 hover:bg-zinc-900 border border-zinc-850 hover:border-blue-500/40 p-3 rounded-2xl transition-all flex flex-col justify-between cursor-pointer"
+                  >
+                    <div className="flex justify-between items-start w-full">
+                      <div>
+                        <span className="text-[10.5px] font-bold text-white group-hover:text-blue-400 transition-colors block">{prog.name}</span>
+                        <span className="text-[9px] text-zinc-500 font-mono block mt-0.5">{prog.exercises.length} exercices &bull; {prog.category}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={(e) => handleDeleteCustomRoutine(prog.id, e)}
+                          className="p-1 rounded bg-red-950/20 text-red-400 hover:bg-red-950 border border-red-900/30 hover:border-red-900/60 transition-all cursor-pointer"
+                          title="Supprimer la routine"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        <span className="text-[8.5px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/15 px-1.5 py-0.5 rounded font-mono shrink-0 uppercase tracking-wider">Charger</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )
+            ) : (
+              ELITE_PROGRAMS.map((prog) => (
+                <button
+                  key={prog.id}
+                  onClick={() => loadPredefinedProgram(prog.id)}
+                  className="group w-full text-left bg-zinc-900/50 hover:bg-zinc-900 border border-zinc-850 hover:border-blue-500/40 p-3 rounded-2xl transition-all flex flex-col justify-between cursor-pointer"
+                >
+                  <div className="flex justify-between items-start w-full">
+                    <div>
+                      <span className="text-[10.5px] font-bold text-white group-hover:text-blue-400 transition-colors block">{prog.name}</span>
+                      <span className="text-[9px] text-zinc-500 font-mono block mt-0.5">{prog.category} &bull; {prog.frequency}</span>
+                    </div>
+                    <span className="text-[8.5px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/15 px-1.5 py-0.5 rounded font-mono shrink-0 uppercase tracking-wider">Charger</span>
+                  </div>
+                  <p className="text-[9px] text-zinc-400 leading-normal mt-1.5 group-hover:text-zinc-300 font-sans">{prog.description}</p>
+                </button>
+              ))
+            )}
           </div>
         </div>
 
@@ -891,8 +1166,117 @@ export default function WorkoutTracker({
               <Dumbbell className="w-5 h-5 text-blue-500" />
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">Bibliothèque Sportive</h3>
             </div>
-            <span className="font-mono text-xs text-zinc-500">{filteredExercises.length} Mouvements</span>
+            <button
+              onClick={() => setShowCustomExerciseForm(!showCustomExerciseForm)}
+              className="text-[10px] font-mono font-bold bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 px-2.5 py-1 rounded-lg border border-blue-500/20 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              {showCustomExerciseForm ? "Fermer ×" : "+ Forger Mouvement"}
+            </button>
           </div>
+
+          {showCustomExerciseForm && (
+            <form onSubmit={handleCreateCustomExercise} className="mb-5 bg-zinc-900/80 border border-zinc-800 p-4 rounded-2xl space-y-3 animate-fadeIn">
+              <span className="text-[10px] font-mono text-blue-400 font-bold block uppercase tracking-wider">🛠️ Forger un nouvel exercice</span>
+              
+              <div className="space-y-1">
+                <label className="text-[9px] font-mono text-zinc-400 uppercase block">Nom du mouvement</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Leg Press Incliné, Tirage Poulie haute..."
+                  value={customExerciseForm.name}
+                  onChange={(e) => setCustomExerciseForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white rounded-xl py-2 px-3 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-mono text-zinc-400 uppercase block">Muscle Principal</label>
+                  <select
+                    value={customExerciseForm.primaryMuscle}
+                    onChange={(e) => setCustomExerciseForm(prev => ({ ...prev, primaryMuscle: e.target.value }))}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white rounded-xl py-2 px-2 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="Pectoraux">Pectoraux</option>
+                    <option value="Quadriceps">Quadriceps</option>
+                    <option value="Ischio-jambiers / Fessiers">Ischio-jambiers / Fessiers</option>
+                    <option value="Grand Dorsal">Grand Dorsal</option>
+                    <option value="Deltoïdes">Deltoïdes</option>
+                    <option value="Triceps">Triceps</option>
+                    <option value="Abdominaux">Abdominaux</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-mono text-zinc-400 uppercase block">Difficulté</label>
+                  <select
+                    value={customExerciseForm.difficulty}
+                    onChange={(e) => setCustomExerciseForm(prev => ({ ...prev, difficulty: e.target.value as any }))}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white rounded-xl py-2 px-2 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="Débutant">Débutant</option>
+                    <option value="Intermédiaire">Intermédiaire</option>
+                    <option value="Avancé">Avancé</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-mono text-zinc-400 uppercase block">Équipement requis</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Aucun, Haltères, Élastique..."
+                    value={customExerciseForm.equipment}
+                    onChange={(e) => setCustomExerciseForm(prev => ({ ...prev, equipment: e.target.value }))}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white rounded-xl py-2 px-3 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-mono text-zinc-400 uppercase block">Description / Note</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Isolation des quads..."
+                    value={customExerciseForm.description}
+                    onChange={(e) => setCustomExerciseForm(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white rounded-xl py-2 px-3 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[9px] font-mono pt-1">
+                <div className="space-y-1">
+                  <label className="text-zinc-500 uppercase block">Conseil Pro</label>
+                  <input
+                    type="text"
+                    placeholder="Garder le buste droit..."
+                    value={customExerciseForm.tips}
+                    onChange={(e) => setCustomExerciseForm(prev => ({ ...prev, tips: e.target.value }))}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-[10px] text-zinc-400 rounded-xl py-1.5 px-2 px-2.5 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-zinc-500 uppercase block">Erreur Commune</label>
+                  <input
+                    type="text"
+                    placeholder="Arrondir le bas du dos..."
+                    value={customExerciseForm.commonMistakes}
+                    onChange={(e) => setCustomExerciseForm(prev => ({ ...prev, commonMistakes: e.target.value }))}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-[10px] text-zinc-400 rounded-xl py-1.5 px-2 px-2.5 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs py-2 rounded-xl transition-all shadow-[0_0_15px_rgba(59,130,246,0.15)] block text-center cursor-pointer mt-1"
+              >
+                Intégrer le mouvement au catalogue
+              </button>
+            </form>
+          )}
 
           <div className="relative mb-4">
             <input
@@ -951,7 +1335,12 @@ export default function WorkoutTracker({
                       </div>
 
                       <h4 className="text-xs font-bold text-white mt-1.5 group-hover:text-blue-400 transition-colors uppercase tracking-wide">{ex.name}</h4>
-                      <p className="text-[10px] font-mono text-zinc-500 leading-tight mt-0.5 mt-0.5 block">{ex.primaryMuscle} &bull; Matos requis: {ex.equipment_required?.join(", ") || "Aucun"}</p>
+                      <p className="text-[10px] font-mono text-zinc-500 leading-tight mt-0.5 block">
+                        {ex.primaryMuscle}
+                        {((activeLocation === "Chez moi" || activeLocation === "Petite salle de sport") && ex.equipment_required && ex.equipment_required.length > 0) ? (
+                          <> &bull; Matos requis: {ex.equipment_required.join(", ")}</>
+                        ) : null}
+                      </p>
                     </div>
 
                     <button
@@ -1101,17 +1490,13 @@ export default function WorkoutTracker({
             <span className="text-[10px] font-mono text-zinc-500">Adapte instantanément la séance</span>
           </div>
 
-          {/* 8 locations list */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {/* 4 smart locations list */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {[
-              { id: "Salle de sport", label: "Salle de sport", icon: <Dumbbell className="w-3.5 h-3.5" /> },
+              { id: "Salle de sport commerciale", label: "Salle commerciale", icon: <Dumbbell className="w-3.5 h-3.5" /> },
+              { id: "Petite salle de sport", label: "Petite salle", icon: <Dumbbell className="w-3.5 h-3.5 text-indigo-400" /> },
               { id: "Chez moi", label: "Chez moi", icon: <Home className="w-3.5 h-3.5" /> },
               { id: "Dehors / Parc", label: "Dehors / Parc", icon: <Compass className="w-3.5 h-3.5" /> },
-              { id: "Hôtel / Voyage", label: "Hôtel", icon: <MapPin className="w-3.5 h-3.5" /> },
-              { id: "Bureau / Travail", label: "Bureau", icon: <Briefcase className="w-3.5 h-3.5" /> },
-              { id: "CrossFit / Box", label: "CrossFit Box", icon: <Zap className="w-3.5 h-3.5" /> },
-              { id: "Piscine", label: "Piscine", icon: <Activity className="w-3.5 h-3.5" /> },
-              { id: "Plusieurs lieux", label: "Multi-lieux", icon: <MapPin className="w-3.5 h-3.5" /> },
             ].map((loc) => {
               const isSelected = activeLocation === loc.id;
               return (
@@ -1136,14 +1521,14 @@ export default function WorkoutTracker({
             })}
           </div>
 
-          {/* Dynamic Post-Selection Equipment Checklist for Chez moi as per V6.0 */}
-          {activeLocation === "Chez moi" && (
+          {/* Dynamic Post-Selection Equipment Checklist for Chez moi and Petite salle de sport */}
+          {(activeLocation === "Chez moi" || activeLocation === "Petite salle de sport") && (
             <div className="bg-zinc-900/40 border border-zinc-850/60 p-4 rounded-2xl space-y-2.5 animate-fadeIn">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-green-400" />
                 <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Tu as du matériel chez toi ?</h4>
-                  <p className="text-[10px] text-zinc-500">Coche ce que tu as sous la main pour affiner ton programme libre :</p>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Tu as du matériel à disposition ?</h4>
+                  <p className="text-[10px] text-zinc-500">Sélectionne tes équipements disponibles pour adapter tes mouvements :</p>
                 </div>
               </div>
 
@@ -1187,31 +1572,223 @@ export default function WorkoutTracker({
           )}
         </div>
 
+        {/* ÉCHAUFFEMENT IA (MOBILITY ENGINE) MODULE */}
+        {(() => {
+          const detectedMuscles = Array.from(new Set(activeSession.logs.map((log) => {
+            const matchingEx = EXERCISE_DATABASE.find((e) => e.id === log.exerciseId);
+            return matchingEx ? matchingEx.primaryMuscle : null;
+          }).filter((m): m is string => m !== null)));
+
+          return (
+            <div id="ai-warmup-module" className="bg-gradient-to-br from-zinc-950 to-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-4 shadow-xl">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-blue-400 animate-pulse" />
+                  <div>
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block">Préparation Articulaire & Mobilité</span>
+                    <h3 className="text-sm font-black text-white uppercase mt-0.5">Échauffement IA Spécifique</h3>
+                  </div>
+                </div>
+                
+                {warmupResult && (
+                  <button
+                    type="button"
+                    onClick={() => setShowWarmupDetail(!showWarmupDetail)}
+                    className="text-[10px] font-mono text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    {showWarmupDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    {showWarmupDetail ? "Masquer" : "Afficher"}
+                  </button>
+                )}
+              </div>
+
+              <p className="text-[11.5px] text-zinc-400 leading-normal">
+                Générez dynamiquement un protocole d'échauffement myofascial, de mobilité active et d'activation nerveuse sur-mesure d'élite ciblé sur vos groupes musculaires du jour.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1.5">
+                {/* Muscle Dropdown */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase font-bold block">Groupe Musculaire Cible</label>
+                  <div className="relative">
+                    <select
+                      value={warmupMuscleGroup}
+                      onChange={(e) => setWarmupMuscleGroup(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-805 text-xs rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500 font-sans appearance-none cursor-pointer"
+                    >
+                      {["Pectoraux", "Quadriceps", "Ischio-jambiers / Fessiers", "Grand Dorsal", "Deltoïdes", "Triceps", "Abdominaux"].map((muscle) => (
+                        <option key={muscle} value={muscle}>
+                          {muscle}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-zinc-500">
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                  {/* Info text if auto-detected */}
+                  {detectedMuscles.length > 0 && detectedMuscles.includes(warmupMuscleGroup) ? (
+                    <span className="text-[9.5px] font-semibold text-emerald-400/90 flex items-center gap-1 mt-1 font-sans">
+                      ✓ Auto-détecté d'après votre séance active
+                    </span>
+                  ) : detectedMuscles.length > 0 ? (
+                    <span className="text-[9.5px] text-zinc-500 flex items-center gap-1 mt-1 font-sans">
+                      Séance repérée : {detectedMuscles.join(", ")}
+                    </span>
+                  ) : (
+                    <span className="text-[9.5px] text-zinc-500 flex items-center gap-1 mt-1 font-sans">
+                      Sélectionnez pour modeler l'échauffement
+                    </span>
+                  )}
+                </div>
+
+                {/* Duration Selector */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase font-bold block">Durée de l'Échauffement</label>
+                  <div className="relative">
+                    <select
+                      value={warmupDuration}
+                      onChange={(e) => setWarmupDuration(Number(e.target.value))}
+                      className="w-full bg-zinc-950 border border-zinc-805 text-xs rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500 font-sans appearance-none cursor-pointer"
+                    >
+                      {[5, 8, 10, 12, 15].map((duration) => (
+                        <option key={duration} value={duration}>
+                          ⏱️ {duration} minutes ({duration < 8 ? "Rapide" : duration > 10 ? "Complet" : "Standard"})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-zinc-500">
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={generateAIWarmup}
+                  disabled={warmupLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.008] duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-[0_4px_12px_rgba(59,130,246,0.2)]"
+                >
+                  {warmupLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Conception biomécanique en cours...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4 text-yellow-300 animate-pulse" />
+                      <span>Générer l'Échauffement IA pour {warmupMuscleGroup}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Warmup output result block */}
+              {warmupLoading && (
+                <div className="border border-zinc-800 bg-zinc-950/40 p-6 rounded-2xl animate-pulse space-y-3.5">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-blue-400 animate-spin" />
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest block animate-pulse">Calcul de la synergie cinétique...</span>
+                  </div>
+                  <div className="h-2 bg-zinc-850 rounded w-3/4"></div>
+                  <div className="h-2 bg-zinc-850 rounded w-5/6"></div>
+                  <div className="h-2 bg-zinc-850 rounded w-2/3"></div>
+                </div>
+              )}
+
+              {warmupError && (
+                <div className="bg-red-500/10 border border-red-500/25 p-3.5 rounded-xl text-xs text-red-400 flex items-center gap-2">
+                  <ShieldAlert className="w-4.5 h-4.5 text-red-500 shrink-0" />
+                  <span>{warmupError}</span>
+                </div>
+              )}
+
+              {warmupResult && showWarmupDetail && !warmupLoading && (
+                <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-4.5 text-zinc-350 max-h-[480px] overflow-y-auto space-y-1 backdrop-blur-sm animate-fadeIn relative text-left">
+                  <div className="sticky top-0 right-0 float-right z-10">
+                    <span className="text-[8px] font-mono text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded uppercase tracking-wider">Plan Élite</span>
+                  </div>
+                  <div className="leading-relaxed text-zinc-300 select-text font-sans">
+                    {renderWarmupMarkdown(warmupResult)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Workout session header */}
-        <div className="bg-zinc-950/40 rounded-3xl border border-zinc-800 p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 backdrop-blur-md relative overflow-hidden">
+        <div className="bg-zinc-950/40 rounded-3xl border border-zinc-800 p-5 flex flex-col justify-between gap-4 backdrop-blur-md relative overflow-hidden">
           <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-3xl rounded-full"></div>
-          <div>
-            <input
-              type="text"
-              value={activeSession.name}
-              onChange={(e) => setActiveSession((prev) => ({ ...prev, name: e.target.value }))}
-              className="text-lg font-bold text-white bg-transparent border-b border-transparent focus:border-zinc-700 focus:outline-none hover:border-zinc-800 w-full md:w-96 text-ellipsis"
-            />
-            <div className="flex flex-wrap items-center gap-4 mt-2 font-mono text-xs text-zinc-500">
-              <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-blue-400" /> Séance active</span>
-              <span>{activeSession.date}</span>
+          
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
+            <div>
+              <input
+                type="text"
+                value={activeSession.name}
+                onChange={(e) => setActiveSession((prev) => ({ ...prev, name: e.target.value }))}
+                className="text-lg font-bold text-white bg-transparent border-b border-transparent focus:border-zinc-700 focus:outline-none hover:border-zinc-800 w-full md:w-96 text-ellipsis font-sans uppercase tracking-tight"
+                title="Renommer la séance"
+              />
+              <div className="flex flex-wrap items-center gap-3 mt-2 font-mono text-xs text-zinc-400">
+                <span className="flex items-center gap-1.5 text-blue-400 font-bold uppercase"><Clock className="w-3.5 h-3.5" /> Séance :</span>
+                
+                <div className="flex items-center gap-1 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
+                  <span className="text-[9px] text-zinc-500 uppercase">Date:</span>
+                  <input
+                    type="text"
+                    value={activeSession.date}
+                    onChange={(e) => setActiveSession((prev) => ({ ...prev, date: e.target.value }))}
+                    className="bg-transparent text-white w-20 text-center font-mono focus:outline-none focus:text-blue-400"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
+                  <span className="text-[9px] text-zinc-500 uppercase">Durée:</span>
+                  <input
+                    type="number"
+                    value={activeSession.duration || 45}
+                    onChange={(e) => setActiveSession((prev) => ({ ...prev, duration: parseInt(e.target.value) || 45 }))}
+                    className="bg-transparent text-white w-10 text-center font-mono focus:outline-none focus:text-blue-400"
+                  />
+                  <span className="text-[9.5px] text-zinc-500">m</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 shrink-0">
+              <div className="bg-zinc-900 border border-zinc-805 px-3 py-1.5 rounded-xl text-center">
+                <span className="text-[9px] font-mono text-zinc-500 uppercase block">VOLUME FÉLIX</span>
+                <span className="text-xs font-bold text-white font-mono flex items-center justify-center gap-1 mt-0.5"><CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> {completedSetsCount} séries</span>
+              </div>
+              <div className="bg-zinc-900 border border-zinc-805 px-3 py-1.5 rounded-xl text-center">
+                <span className="text-[9px] font-mono text-zinc-500 uppercase block font-bold">TONNAGE</span>
+                <span className="text-xs font-bold text-blue-400 font-mono flex items-center justify-center gap-1 mt-0.5"><Flame className="w-3.5 h-3.5 text-amber-500" /> {cumulativeTonnage.toLocaleString("fr-FR")} kg</span>
+              </div>
             </div>
           </div>
 
-          <div className="flex gap-4">
-            <div className="bg-zinc-900 border border-zinc-800 px-3.5 py-1.5 rounded-xl text-center">
-              <span className="text-[10px] font-mono text-zinc-500 uppercase block">VOLUME EFFECTUÉ</span>
-              <span className="text-sm font-bold text-white font-mono flex items-center justify-center gap-1"><CheckCircle2 className="w-4 h-4 text-green-400" /> {completedSetsCount} séries</span>
-            </div>
-            <div className="bg-zinc-900 border border-zinc-800 px-3.5 py-1.5 rounded-xl text-center">
-              <span className="text-[10px] font-mono text-zinc-500 uppercase block font-bold">TONNAGE TOTAL</span>
-              <span className="text-xs font-bold text-blue-400 font-mono flex items-center justify-center gap-1"><Flame className="w-4 h-4 text-amber-500" /> {cumulativeTonnage.toLocaleString("fr-FR")} kg</span>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-zinc-900 mt-2.5">
+            <span className="text-[9px] font-mono text-zinc-500 uppercase">Enregistreur de routine :</span>
+            <input
+              type="text"
+              id="custom-routine-name-input"
+              placeholder="Nom du modèle (ex: Pectoraux Intensité)..."
+              className="bg-zinc-900 border border-zinc-800 text-[10.5px] text-white rounded-lg px-2.5 py-1 w-60 focus:outline-none focus:border-blue-500 font-sans"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("custom-routine-name-input") as HTMLInputElement;
+                handleSaveAsCustomRoutine(el?.value || "");
+                if (el) el.value = "";
+              }}
+              className="bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-400 text-[10px] font-bold px-3 py-1 rounded-lg transition-all cursor-pointer"
+            >
+              💾 Sauver en Modèle
+            </button>
           </div>
         </div>
 

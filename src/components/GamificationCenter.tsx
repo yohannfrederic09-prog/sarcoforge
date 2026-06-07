@@ -166,42 +166,57 @@ export default function GamificationCenter({
 
         {/* Global Leaderboards */}
         <div className="bg-zinc-950/40 border border-zinc-800 rounded-3xl p-5 backdrop-blur-md">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider pb-3 border-b border-zinc-900 mb-4 flex items-center gap-1.5">
-            <Trophy className="w-4.5 h-4.5 text-yellow-500" /> Tableau des Champions Club
-          </h3>
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-905 mb-3">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+              <Trophy className="w-4.5 h-4.5 text-yellow-500" /> Tableau des Champions Club
+            </h3>
+            <span className="text-[8px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+              🛡️ 100% Authentique
+            </span>
+          </div>
+
+          <p className="text-[10px] text-zinc-500 leading-normal mb-4 font-sans">
+            Ce classement affiche exclusivement les athlètes réels inscrits sur la forge. Aucun compte factice ou robot n'est toléré dans le temple de l'effort physique.
+          </p>
 
           <div className="space-y-2.5">
-            {leaderboard.map((user) => (
-              <div
-                key={user.rank}
-                className={`p-3 rounded-2xl border flex items-center justify-between ${
-                  user.isCurrentUser
-                    ? "bg-blue-500/5 border-blue-500/30 text-blue-400"
-                    : "bg-zinc-900/50 border-zinc-800"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className={`text-xs font-mono font-bold w-6 text-center ${
-                    user.rank === 1 ? "text-yellow-400" : user.rank === 2 ? "text-zinc-400" : "text-zinc-500"
-                  }`}>
-                    #{user.rank}
-                  </span>
-                  <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-black text-xs text-white uppercase">
-                    {user.avatar}
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                      {user.name} {user.isCurrentUser && <span className="text-[8px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-mono font-bold uppercase">Vous</span>}
-                    </h4>
-                    <span className="text-[9px] font-mono text-zinc-500">Niveau {user.level} &bull; Progression stable</span>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-xs font-bold text-white font-mono block">{user.xp.toLocaleString("fr-FR")} XP</span>
-                </div>
+            {leaderboard.length === 0 ? (
+              <div className="text-center py-6 text-zinc-600 text-xs font-mono">
+                Chargement des athlètes réels du cloud...
               </div>
-            ))}
+            ) : (
+              leaderboard.map((user) => (
+                <div
+                  key={user.rank}
+                  className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${
+                    user.isCurrentUser
+                      ? "bg-blue-500/5 border-blue-500/30 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.05)]"
+                      : "bg-zinc-900/50 border-zinc-800 hover:border-zinc-750"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs font-mono font-bold w-6 text-center ${
+                      user.rank === 1 ? "text-yellow-400 font-extrabold text-sm" : user.rank === 2 ? "text-zinc-400" : "text-zinc-500"
+                    }`}>
+                      #{user.rank}
+                    </span>
+                    <div className="w-8 h-8 rounded-full bg-zinc-805 border border-zinc-700 flex items-center justify-center font-black text-xs text-white uppercase">
+                      {user.avatar}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                        {user.name} {user.isCurrentUser && <span className="text-[8px] bg-blue-500/25 text-blue-400 px-1.5 py-0.5 rounded font-mono font-bold uppercase">Moi</span>}
+                      </h4>
+                      <span className="text-[9px] font-mono text-zinc-500">Niveau {user.level} &bull; Profil d'Effort Réel</span>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-white font-mono block">{user.xp.toLocaleString("fr-FR")} XP</span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

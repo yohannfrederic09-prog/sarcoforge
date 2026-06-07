@@ -1,1 +1,171 @@
 @import "tailwindcss";
+
+/* 🚀 FUTURISTIC THEME ENGINE OVERRIDES - CLAIR/SOMBRE CONNECTÉ */
+:root {
+  --color-brand-blue: #3b82f6;
+  --color-brand-indigo: #6366f1;
+}
+
+/* Base Body/HTML adjustments */
+.theme-light {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  color-scheme: light;
+}
+
+.theme-light body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Background class mappings */
+.theme-light .bg-\[\#070708\] {
+  background-color: #f8fafc !important;
+}
+.theme-light .bg-zinc-950 {
+  background-color: #ffffff !important;
+}
+.theme-light .bg-zinc-900 {
+  background-color: #f1f5f9 !important;
+}
+.theme-light .bg-zinc-950\/40,
+.theme-light .bg-zinc-950\/50,
+.theme-light .bg-black\/40 {
+  background-color: rgba(241, 245, 249, 0.75) !important;
+}
+.theme-light .bg-zinc-950\/80,
+.theme-light .bg-[#0a0a0c] {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+}
+.theme-light .bg-zinc-900\/50 {
+  background-color: rgba(241, 245, 249, 0.45) !important;
+}
+.theme-light .bg-zinc-950\/30 {
+  background-color: rgba(241, 245, 249, 0.3) !important;
+}
+.theme-light .bg-zinc-850,
+.theme-light .bg-zinc-800 {
+  background-color: #e2e8f0 !important;
+}
+.theme-light .bg-zinc-950\/60 {
+  background-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Sidebar and active components */
+.theme-light aside {
+  background-color: #ffffff !important;
+  border-right-color: #e2e8f0 !important;
+}
+
+/* Gradients */
+.theme-light .from-zinc-950 {
+  --tw-gradient-from: #ffffff !important;
+  --tw-gradient-to: #f1f5f9 !important;
+}
+.theme-light .to-zinc-900 {
+  --tw-gradient-to: #f1f5f9 !important;
+}
+.theme-light .from-zinc-900 {
+  --tw-gradient-from: #f1f5f9 !important;
+}
+.theme-light .bg-gradient-to-br.from-zinc-950 {
+  background-image: linear-gradient(to bottom right, #ffffff, #f1f5f9) !important;
+}
+
+/* Text class mappings */
+.theme-light .text-white,
+.theme-light .text-zinc-50,
+.theme-light .text-zinc-100 {
+  color: #0f172a !important;
+}
+.theme-light .text-zinc-200 {
+  color: #1e293b !important;
+}
+.theme-light .text-zinc-300 {
+  color: #334155 !important;
+}
+.theme-light .text-zinc-400 {
+  color: #475569 !important;
+}
+.theme-light .text-zinc-500 {
+  color: #64748b !important;
+}
+.theme-light .text-zinc-600 {
+  color: #94a3b8 !important;
+}
+
+/* Dynamic exception selectors */
+.theme-light .text-zinc-400.font-mono {
+  color: #475569 !important;
+}
+.theme-light .text-zinc-550 {
+  color: #475569 !important;
+}
+
+/* Borders */
+.theme-light .border-zinc-900,
+.theme-light .border-zinc-800,
+.theme-light .border-zinc-850,
+.theme-light .border-zinc-805,
+.theme-light .border-zinc-700 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Select and inputs */
+.theme-light select,
+.theme-light input,
+.theme-light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+.theme-light select:focus,
+.theme-light input:focus,
+.theme-light textarea:focus {
+  border-color: #3b82f6 !important;
+  outline: none;
+}
+
+/* Active tab styles */
+.theme-light .bg-blue-600\/10 {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+}
+.theme-light .text-blue-400 {
+  color: #1d4ed8 !important;
+}
+
+/* Progress bar rail colors */
+.theme-light .bg-zinc-800\/55,
+.theme-light .bg-zinc-850\/50,
+.theme-light .bg-zinc-900\/40,
+.theme-light .bg-zinc-900 {
+  background-color: #e2e8f0 !important;
+}
+
+/* Cards box-shadow and depth */
+.theme-light .shadow-xl {
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.04), 0 8px 10px -6px rgba(15, 23, 42, 0.03) !important;
+}
+.theme-light .shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* Recharts charts tooltip adjustments */
+.theme-light .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+.theme-light .recharts-legend-item-text {
+  color: #475569 !important;
+}
+
+/* Specific elements refinements for coach chat messages */
+.theme-light .coach-message-ai {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+.theme-light .coach-message-user {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}

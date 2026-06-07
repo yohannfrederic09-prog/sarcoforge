@@ -1,0 +1,48 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with level, XP, and sync details",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Auth identifier matching request.auth.uid" },
+        "displayName": { "type": "string", "description": "The printable user nickname" },
+        "email": { "type": "string", "description": "The certified email coordinates of the athlete" },
+        "photoURL": { "type": "string", "description": "URL to profile pic avatar" },
+        "level": { "type": "number", "description": "Current RPG athlete level state" },
+        "xp": { "type": "number", "description": "Current amount of cumulative experience points" },
+        "xpNeeded": { "type": "number", "description": "Minimum experience threshold required for next level promotion" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Instant of user creation" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Instant of profile modification" }
+      },
+      "required": ["userId", "email"]
+    },
+    "UserWorkout": {
+      "title": "User Workout",
+      "description": "Logged workout session for persistent sync",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "date": { "type": "string" },
+        "duration": { "type": "number" },
+        "totalTonnage": { "type": "number" },
+        "totalVolume": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sessionId", "userId", "name", "date", "completed"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document containing authentication attributes and level progress."
+    },
+    "/users/{userId}/workouts/{workoutId}": {
+      "schema": "UserWorkout",
+      "description": "History of workout sessions registered by the authenticated user."
+    }
+  }
+}

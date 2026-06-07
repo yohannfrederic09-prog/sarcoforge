@@ -10,6 +10,7 @@ export interface Exercise {
   tips: string[];
   commonMistakes: string[];
   videoUrl?: string;
+  isCustom?: boolean;
 }
 
 export interface SetRecord {

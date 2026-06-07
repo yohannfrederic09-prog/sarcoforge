@@ -22,9 +22,9 @@ export default function OnboardingWizard({ onComplete, initialData }: Onboarding
       experience: "Intermédiaire (1-4 ans)",
       medicalRestrictions: "",
       timeAvailable: "3-4 jours/semaine",
-      availableEquipment: "Salle complète",
+      availableEquipment: "Salle de sport commerciale",
       dietaryPreferences: "Riche en Protéines",
-      trainingLocations: ["Salle complète"],
+      trainingLocations: ["Salle de sport commerciale"],
       specificEquipment: ["Haltères fixes", "Bandes élastiques légères", "Tapis de sol (yoga mat)"],
       equipmentBudget: "Pas de budget pour l'instant",
       constraints: [],
@@ -448,28 +448,37 @@ ${
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 {
-                  id: "Salle de sport",
-                  title: "Salle de sport",
-                  description: "Accès complet à tous les équipements",
-                  supposed: "Machines, haltères, barres",
-                  badge: "Accès complet",
+                  id: "Salle de sport commerciale",
+                  title: "Salle de sport commerciale",
+                  description: "Accès total (Basic-Fit, Fitness Park, etc.)",
+                  supposed: "Toutes machines, halteres, barres directes",
+                  badge: "Sans contrainte",
                   color: "border-blue-500/40 text-blue-400 bg-blue-950/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]",
                   icon: <Dumbbell className="w-5 h-5 text-blue-500" />
+                },
+                {
+                  id: "Petite salle de sport",
+                  title: "Petite salle de sport",
+                  description: "Salle d'hôtel, résidence ou petit studio privé",
+                  supposed: "Sélectionnez vos équipements ci-dessous",
+                  badge: "Matériel restreint",
+                  color: "border-indigo-500/40 text-indigo-400 bg-indigo-950/10 shadow-[0_0_15px_rgba(99,102,241,0.15)]",
+                  icon: <Dumbbell className="w-5 h-5 text-indigo-400" />
                 },
                 {
                   id: "Chez moi",
                   title: "Chez moi",
                   description: "À la maison, dans mon espace personnel",
-                  supposed: "Exercices adaptés, aucun équipement requis",
-                  badge: "Sans contrainte",
+                  supposed: "Exercices adaptés à vos équipements",
+                  badge: "Séance maison",
                   color: "border-green-500/40 text-green-400 bg-green-950/10 shadow-[0_0_15px_rgba(16,185,129,0.15)]",
                   icon: <Home className="w-5 h-5 text-green-500" />
                 },
                 {
                   id: "Dehors / Parc",
                   title: "Dehors / Parc",
-                  description: "Running, street workout, espaces verts",
-                  supposed: "Cardio, poids du corps, barres de parc",
+                  description: "Running, street workout, calisthénie",
+                  supposed: "Poids de corps, barres de traction extérieures",
                   badge: "Poids de corps",
                   color: "border-amber-500/40 text-amber-400 bg-amber-950/10 shadow-[0_0_15px_rgba(245,158,11,0.15)]",
                   icon: <Compass className="w-5 h-5 text-amber-500" />

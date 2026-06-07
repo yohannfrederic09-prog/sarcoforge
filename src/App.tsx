@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { OnboardingData, WorkoutSession, Challenge, Badge, LeaderboardUser } from "./types";
 import OnboardingWizard from "./components/OnboardingWizard";
 import WorkoutTracker from "./components/WorkoutTracker";
@@ -9,6 +9,10 @@ import CommunityFeed from "./components/CommunityFeed";
 import GamificationCenter from "./components/GamificationCenter";
 import AdminPanel from "./components/AdminPanel";
 import DevOpsConsole from "./components/DevOpsConsole";
+import AccountSection from "./components/AccountSection";
+import { auth, db, handleFirestoreError, OperationType } from "./lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import {
   Sparkles,
   Dumbbell,
@@ -26,86 +30,436 @@ import {
   BookOpen,
   DollarSign,
   Heart,
-  UserCheck
+  UserCheck,
+  User,
+  CloudCheck,
+  RefreshCw,
+  Loader2,
+  Sun,
+  Moon,
+  Monitor
 } from "lucide-react";
 
 export default function App() {
+  // Theme Mode preferences (Sombre, Clair ou Automatique/Système)
+  type ThemeMode = "dark" | "light" | "auto";
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    return (localStorage.getItem("sarcoforge_theme_preference") as ThemeMode) || "auto";
+  });
+  const [isDark, setIsDark] = useState<boolean>(true);
+
+  useEffect(() => {
+    const handleThemeChange = () => {
+      if (themeMode === "auto") {
+        const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        setIsDark(systemPrefersDark);
+      } else {
+        setIsDark(themeMode === "dark");
+      }
+    };
+
+    handleThemeChange();
+
+    if (themeMode === "auto") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const listener = (e: MediaQueryListEvent) => {
+        setIsDark(e.matches);
+      };
+      mediaQuery.addEventListener("change", listener);
+      return () => mediaQuery.removeEventListener("change", listener);
+    }
+  }, [themeMode]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_theme_preference", themeMode);
+    if (isDark) {
+      document.documentElement.classList.remove("theme-light");
+      document.documentElement.classList.add("theme-dark");
+    } else {
+      document.documentElement.classList.remove("theme-dark");
+      document.documentElement.classList.add("theme-light");
+    }
+  }, [themeMode, isDark]);
+
   // Navigation states
-  const [activeTab, setActiveTab] = useState<string>("onboarding");
-  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
-  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
-  const [aiPlanText, setAiPlanText] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return localStorage.getItem("sarcoforge_activeTab") || "onboarding";
+  });
+  const [onboardingCompleted, setOnboardingCompleted] = useState(() => {
+    return localStorage.getItem("sarcoforge_onboardingCompleted") === "true";
+  });
+  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(() => {
+    const raw = localStorage.getItem("sarcoforge_onboardingData");
+    return raw ? JSON.parse(raw) : null;
+  });
+  const [aiPlanText, setAiPlanText] = useState<string | null>(() => {
+    return localStorage.getItem("sarcoforge_aiPlanText") || null;
+  });
 
   // Core Gamification levels state
-  const [level, setLevel] = useState(1);
-  const [xp, setXp] = useState(350);
-  const [xpNeeded, setXpNeeded] = useState(1000);
+  const [level, setLevel] = useState<number>(() => {
+    const val = localStorage.getItem("sarcoforge_level");
+    return val ? parseInt(val, 10) : 1;
+  });
+  const [xp, setXp] = useState<number>(() => {
+    const val = localStorage.getItem("sarcoforge_xp");
+    return val ? parseInt(val, 10) : 350;
+  });
+  const [xpNeeded, setXpNeeded] = useState<number>(() => {
+    const val = localStorage.getItem("sarcoforge_xpNeeded");
+    return val ? parseInt(val, 10) : 1000;
+  });
   const [showLevelUpToast, setShowLevelUpToast] = useState(false);
 
   // Global Workout state logs
-  const [sessions, setSessions] = useState<WorkoutSession[]>([]);
+  const [sessions, setSessions] = useState<WorkoutSession[]>(() => {
+    const raw = localStorage.getItem("sarcoforge_sessions");
+    return raw ? JSON.parse(raw) : [];
+  });
 
   // Daily dynamic macro consumption state
-  const [consumedCal, setConsumedCal] = useState(1130);
-  const [consumedProt, setConsumedProt] = useState(80);
-  const [consumedCarb, setConsumedCarb] = useState(130);
-  const [consumedLip, setConsumedLip] = useState(30);
+  const [consumedCal, setConsumedCal] = useState<number>(() => {
+    const val = localStorage.getItem("sarcoforge_consumedCal");
+    return val ? parseInt(val, 10) : 1130;
+  });
+  const [consumedProt, setConsumedProt] = useState<number>(() => {
+    const val = localStorage.getItem("sarcoforge_consumedProt");
+    return val ? parseInt(val, 10) : 80;
+  });
+  const [consumedCarb, setConsumedCarb] = useState<number>(() => {
+    const val = localStorage.getItem("sarcoforge_consumedCarb");
+    return val ? parseInt(val, 10) : 130;
+  });
+  const [consumedLip, setConsumedLip] = useState<number>(() => {
+    const val = localStorage.getItem("sarcoforge_consumedLip");
+    return val ? parseInt(val, 10) : 30;
+  });
 
   // Challenges array state linking progress to physical achievements
-  const [challenges, setChallenges] = useState<Challenge[]>([
-    {
-      id: "ch_water",
-      title: "Optimisation de l'Hydratation",
-      description: "Buvez au moins 2.5L d'eau aujourd'hui pour soutenir vos fonctions cellulaires.",
-      category: "Nutrition",
-      targetValue: 2.5,
-      currentValue: 1.0, // linked to water cups
-      unit: "L",
-      xpReward: 100,
-      completed: false,
-      claimed: false,
-    },
-    {
-      id: "ch_sets",
-      title: "Entêtement musculaire de Force",
-      description: "Validez au moins 3 séries d'exercices complétées dans votre journal actif.",
-      category: "Workout",
-      targetValue: 3,
-      currentValue: 0,
-      unit: "séries",
-      xpReward: 150,
-      completed: false,
-      claimed: false,
-    },
-    {
-      id: "ch_tonnage",
-      title: "Somme de Fonte (Tonnage)",
-      description: "Atteignez un volume cumulé de 3,000kg de fonte soulevée sur la semaine.",
-      category: "Workout",
-      targetValue: 3000,
-      currentValue: 0,
-      unit: "kg",
-      xpReward: 300,
-      completed: false,
-      claimed: false,
-    }
-  ]);
+  const [challenges, setChallenges] = useState<Challenge[]>(() => {
+    const raw = localStorage.getItem("sarcoforge_challenges");
+    if (raw) return JSON.parse(raw);
+    return [
+      {
+        id: "ch_water",
+        title: "Optimisation de l'Hydratation",
+        description: "Buvez au moins 2.5L d'eau aujourd'hui pour soutenir vos fonctions cellulaires.",
+        category: "Nutrition",
+        targetValue: 2.5,
+        currentValue: 1.0, // linked to water cups
+        unit: "L",
+        xpReward: 100,
+        completed: false,
+        claimed: false,
+      },
+      {
+        id: "ch_sets",
+        title: "Entêtement musculaire de Force",
+        description: "Valisez au moins 3 séries d'exercices complétées dans votre journal actif.",
+        category: "Workout",
+        targetValue: 3,
+        currentValue: 0,
+        unit: "séries",
+        xpReward: 150,
+        completed: false,
+        claimed: false,
+      },
+      {
+        id: "ch_tonnage",
+        title: "Somme de Fonte (Tonnage)",
+        description: "Atteignez un volume cumulé de 3,000kg de fonte soulevée sur la semaine.",
+        category: "Workout",
+        targetValue: 3000,
+        currentValue: 0,
+        unit: "kg",
+        xpReward: 300,
+        completed: false,
+        claimed: false,
+      }
+    ];
+  });
 
   // Achievements array state
-  const [badges, setBadges] = useState<Badge[]>([
-    { id: "bdg_0", title: "Tonne d'Acier", description: "Soulever 5,000kg de tonnage cumulé sur une séance.", icon: "Flame", unlocked: false, xpValue: 150 },
-    { id: "bdg_1", title: "Sorcier de la Macro", description: "Enregistrer vos premiers repas du jour dans le Nutrition Center.", icon: "Award", unlocked: true, xpValue: 100 },
-    { id: "bdg_2", title: "Onboardé d'Élite", description: "Compléter le diagnostic biométrique et calibrer les métabolismes.", icon: "Check", unlocked: true, xpValue: 100 },
-    { id: "bdg_3", title: "Compagnon du Coach", description: "Dialoguer avec le Coach IA SarcoForge pour briser un plateau.", icon: "Sparkles", unlocked: false, xpValue: 150 },
-  ]);
+  const [badges, setBadges] = useState<Badge[]>(() => {
+    const raw = localStorage.getItem("sarcoforge_badges");
+    if (raw) return JSON.parse(raw);
+    return [
+      { id: "bdg_0", title: "Tonne d'Acier", description: "Soulever 5,000kg de tonnage cumulé sur une séance.", icon: "Flame", unlocked: false, xpValue: 150 },
+      { id: "bdg_1", title: "Sorcier de la Macro", description: "Enregistrer vos premiers repas du jour dans le Nutrition Center.", icon: "Award", unlocked: true, xpValue: 100 },
+      { id: "bdg_2", title: "Onboardé d'Élite", description: "Compléter le diagnostic biométrique et calibrer les métabolismes.", icon: "Check", unlocked: true, xpValue: 100 },
+      { id: "bdg_3", title: "Compagnon du Coach", description: "Dialoguer avec le Coach IA SarcoForge pour briser un plateau.", icon: "Sparkles", unlocked: false, xpValue: 150 },
+    ];
+  });
 
-  // Global ranking leaders mockup
-  const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([
-    { rank: 1, name: "Lucas 'Viking'", avatar: "LV", level: 12, xp: 12450 },
-    { rank: 2, name: "Sophie Martinez", avatar: "SM", level: 8, xp: 8400 },
-    { rank: 3, name: "Yohann-Athlète", avatar: "YA", level: 1, xp: 350, isCurrentUser: true },
-    { rank: 4, name: "Marc Vacher", avatar: "MV", level: 4, xp: 3900 },
-  ]);
+  // Global ranking leaders containing ONLY real registered users
+  const [leaderboard, setLeaderboard] = useState<LeaderboardUser[]>([]);
+
+  // Firebase Auto Sync & Realtime Auth Tracker state
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [cloudLoading, setCloudLoading] = useState<boolean>(false);
+  const [cloudToast, setCloudToast] = useState<{message: string, type: 'success' | 'info' | 'error'} | null>(null);
+
+  // Sync to local storage on changes
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_activeTab", activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_onboardingCompleted", String(onboardingCompleted));
+  }, [onboardingCompleted]);
+
+  useEffect(() => {
+    if (onboardingData) {
+      localStorage.setItem("sarcoforge_onboardingData", JSON.stringify(onboardingData));
+    } else {
+      localStorage.removeItem("sarcoforge_onboardingData");
+    }
+  }, [onboardingData]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_aiPlanText", aiPlanText || "");
+  }, [aiPlanText]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_level", String(level));
+  }, [level]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_xp", String(xp));
+  }, [xp]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_xpNeeded", String(xpNeeded));
+  }, [xpNeeded]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_sessions", JSON.stringify(sessions));
+  }, [sessions]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_consumedCal", String(consumedCal));
+  }, [consumedCal]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_consumedProt", String(consumedProt));
+  }, [consumedProt]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_consumedCarb", String(consumedCarb));
+  }, [consumedCarb]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_consumedLip", String(consumedLip));
+  }, [consumedLip]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_challenges", JSON.stringify(challenges));
+  }, [challenges]);
+
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_badges", JSON.stringify(badges));
+  }, [badges]);
+
+  // Auth monitoring and automatic background cloud restore/save logic
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        setCloudLoading(true);
+        const userPath = `users/${user.uid}`;
+        try {
+          const docRef = doc(db, "users", user.uid);
+          let docSnap;
+          try {
+            docSnap = await getDoc(docRef);
+          } catch (err: any) {
+            handleFirestoreError(err, OperationType.GET, userPath);
+            throw err;
+          }
+
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            
+            // Re-hydrate local values if they exist on the user's secure account
+            if (data.level) setLevel(data.level);
+            if (data.xp !== undefined) setXp(data.xp);
+            if (data.xpNeeded) setXpNeeded(data.xpNeeded);
+            if (data.onboardingData) {
+              setOnboardingData(data.onboardingData);
+              setOnboardingCompleted(true);
+            }
+            if (data.aiPlanText) setAiPlanText(data.aiPlanText);
+            if (data.sessions) setSessions(data.sessions);
+            if (data.consumedCal !== undefined) setConsumedCal(data.consumedCal);
+            if (data.consumedProt !== undefined) setConsumedProt(data.consumedProt);
+            if (data.consumedCarb !== undefined) setConsumedCarb(data.consumedCarb);
+            if (data.consumedLip !== undefined) setConsumedLip(data.consumedLip);
+            if (data.challenges) setChallenges(data.challenges);
+            if (data.badges) setBadges(data.badges);
+
+            // Navigate securely to dashboard if already completed
+            if (data.onboardingData && activeTab === "onboarding") {
+              setActiveTab("dashboard");
+            }
+
+            setCloudToast({
+              message: "🪐 Profil synchronisé ! Données restaurées depuis la base sécurisée SarcoForge Cloud.",
+              type: "success"
+            });
+            setTimeout(() => setCloudToast(null), 5000);
+          } else {
+            // First login ever: safely backup existing local states to the new cloud account
+            const payload = {
+              userId: user.uid,
+              displayName: user.displayName || "Athlète SarcoForge",
+              email: user.email || "",
+              photoURL: user.photoURL || "",
+              level: level,
+              xp: xp,
+              xpNeeded: xpNeeded,
+              onboardingData: onboardingData,
+              aiPlanText: aiPlanText,
+              sessions: sessions,
+              consumedCal: consumedCal,
+              consumedProt: consumedProt,
+              consumedCarb: consumedCarb,
+              consumedLip: consumedLip,
+              challenges: challenges,
+              badges: badges,
+              lastSyncedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            try {
+              await setDoc(docRef, payload);
+            } catch (err: any) {
+              handleFirestoreError(err, OperationType.CREATE, userPath);
+              throw err;
+            }
+            setCloudToast({
+              message: "☁️ Première synchronisation ! Profil local et sauvegardes sécurisés sur votre compte Cloud.",
+              type: "info"
+            });
+            setTimeout(() => setCloudToast(null), 5000);
+          }
+        } catch (err: any) {
+          console.error("Cloud synchronization mismatch error:", err);
+          setCloudToast({
+            message: "⚠️ Alerte de synchronisation: l'accès aux règles de sécurité a restreint la synchronisation cloud automatique.",
+            type: "error"
+          });
+          setTimeout(() => setCloudToast(null), 4000);
+        } finally {
+          setCloudLoading(false);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [auth]);
+
+  // Debounced Cloud Autosave listener whenever core states of work modification are applied
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const debounceSave = setTimeout(async () => {
+      try {
+        const docRef = doc(db, "users", currentUser.uid);
+        const payload = {
+          userId: currentUser.uid,
+          displayName: currentUser.displayName || "Athlète SarcoForge",
+          email: currentUser.email || "",
+          photoURL: currentUser.photoURL || "",
+          level: level,
+          xp: xp,
+          xpNeeded: xpNeeded,
+          onboardingData: onboardingData,
+          aiPlanText: aiPlanText,
+          sessions: sessions,
+          consumedCal: consumedCal,
+          consumedProt: consumedProt,
+          consumedCarb: consumedCarb,
+          consumedLip: consumedLip,
+          challenges: challenges,
+          badges: badges,
+          lastSyncedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        await setDoc(docRef, payload);
+      } catch (err) {
+        console.warn("Silent background save delayed or security rule block:", err);
+      }
+    }, 2000); // 2 second throttle/debounce to preserve write quotas
+
+    return () => clearTimeout(debounceSave);
+  }, [onboardingData, aiPlanText, level, xp, xpNeeded, sessions, consumedCal, consumedProt, consumedCarb, consumedLip, challenges, badges, currentUser]);
+
+  // Load real leaderboard from Firestore containing ONLY users with actual accounts
+  const fetchRealLeaderboard = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "users"));
+      const usersList: LeaderboardUser[] = [];
+      
+      querySnapshot.forEach((docSnap) => {
+        const val = docSnap.data();
+        if (val.userId && (val.displayName || val.email)) { // must be a real account user
+          usersList.push({
+            rank: 0,
+            name: val.displayName || "Athlète SarcoForge",
+            avatar: val.displayName ? val.displayName.substring(0, 2).toUpperCase() : "AT",
+            level: val.level || 1,
+            xp: val.xp || 0,
+            isCurrentUser: currentUser && val.userId === currentUser.uid
+          });
+        }
+      });
+
+      // If current user is not in the list (e.g. they aren't logged in, or local state is primary), make sure we add them!
+      const userExistsInCloud = currentUser && usersList.some(u => u.isCurrentUser);
+      if (!userExistsInCloud) {
+        usersList.push({
+          rank: 0,
+          name: currentUser?.displayName || "Mon Profil (Local)",
+          avatar: currentUser?.displayName ? currentUser.displayName.substring(0, 2).toUpperCase() : "MO",
+          level: level,
+          xp: xp,
+          isCurrentUser: true
+        });
+      }
+
+      // Sort by Level first, then XP descending
+      usersList.sort((a, b) => {
+        if (b.level !== a.level) {
+          return b.level - a.level;
+        }
+        return b.xp - a.xp;
+      });
+
+      // Re-assign correct ranks
+      const rankedList = usersList.map((usr, index) => ({
+        ...usr,
+        rank: index + 1
+      }));
+
+      setLeaderboard(rankedList);
+    } catch (err) {
+      console.warn("Could not load full cloud leaderboard, defaulting to active local user:", err);
+      // Fallback: only show the current active user to eliminate any fake/mock user records
+      setLeaderboard([
+        {
+          rank: 1,
+          name: currentUser?.displayName || "Mon Profil (Local)",
+          avatar: currentUser?.displayName ? currentUser.displayName.substring(0, 2).toUpperCase() : "MO",
+          level: level,
+          xp: xp,
+          isCurrentUser: true
+        }
+      ]);
+    }
+  };
+
+  useEffect(() => {
+    fetchRealLeaderboard();
+  }, [currentUser, level, xp]);
 
   // Callback when Onboarding concludes
   const handleOnboardingComplete = (data: OnboardingData, planText: string) => {
@@ -116,6 +470,14 @@ export default function App() {
 
     // Award initial setup XP (150XP)
     addXP(150);
+  };
+
+  // Helper sync update to unlock premium dashboards after restore
+  const handleUpdateOnboarding = (data: OnboardingData) => {
+    setOnboardingData(data);
+    if (data) {
+      setOnboardingCompleted(true);
+    }
   };
 
   // Helper handling progressive RPG levels experience thresholds
@@ -145,7 +507,12 @@ export default function App() {
             }
             return user;
           })
-          .sort((a, b) => b.xp - a.xp)
+          .sort((a, b) => {
+            if (b.level !== a.level) {
+              return b.level - a.level;
+            }
+            return b.xp - a.xp;
+          })
           .map((user, idx) => ({ ...user, rank: idx + 1 }))
       );
 
@@ -230,6 +597,24 @@ export default function App() {
         </div>
       )}
 
+      {/* Cloud Sync Status Toast Notification */}
+      {cloudToast && (
+        <div className={`fixed bottom-6 left-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl border backdrop-blur-md animate-fadeIn-fast ${
+          cloudToast.type === "success" 
+            ? "bg-emerald-950/90 border-emerald-500/20 text-emerald-300" 
+            : cloudToast.type === "error"
+            ? "bg-red-950/90 border-red-500/20 text-red-300"
+            : "bg-blue-950/90 border-blue-500/20 text-blue-300"
+        }`}>
+          {cloudLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+          ) : (
+            <User className="w-4 h-4 text-emerald-400" />
+          )}
+          <span className="text-[11px] font-semibold">{cloudToast.message}</span>
+        </div>
+      )}
+
       {/* Header Bar */}
       <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-40 px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -239,19 +624,78 @@ export default function App() {
           <span className="text-md font-black tracking-wider uppercase font-mono text-white">Sarco<span className="text-blue-500">Forge</span></span>
         </div>
 
-        {/* Global Athlete Progress Bar in Header */}
-        <div className="hidden md:flex items-center gap-4 mr-4">
-          <div className="text-right">
-            <span className="text-[10px] font-mono text-zinc-500 block">ATHLÈTE RANG</span>
-            <span className="text-xs font-bold text-white uppercase font-mono tracking-wide">Niveau {level}</span>
+        <div className="flex items-center gap-4">
+          {/* Cloud Synchronization Indicator */}
+          {currentUser ? (
+            <div className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/15 text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold flex items-center gap-1">Données Sécurisées: {currentUser.displayName || currentUser.email || "Athlète"}</span>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setActiveTab("account")}
+              className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/15 text-amber-400 hover:bg-amber-500/20 transition-all cursor-pointer"
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold">Sauvegarde Locale (Compte non lié)</span>
+            </button>
+          )}
+
+          {/* Global Athlete Progress Bar in Header */}
+          <div className="hidden md:flex items-center gap-4 mr-4">
+            <div className="text-right">
+              <span className="text-[10px] font-mono text-zinc-500 block">ATHLÈTE RANG</span>
+              <span className="text-xs font-bold text-white uppercase font-mono tracking-wide">Niveau {level}</span>
+            </div>
+            <div className="w-40 bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-850 relative">
+              <div
+                className="bg-gradient-to-r from-yellow-500 to-amber-500 h-full rounded-full transition-all duration-300"
+                style={{ width: `${Math.round((xp / xpNeeded) * 100)}%` }}
+              />
+            </div>
+            <span className="text-xs font-bold text-zinc-400 font-mono">{Math.round((xp / xpNeeded) * 100)}%</span>
           </div>
-          <div className="w-40 bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-850 relative">
-            <div
-              className="bg-gradient-to-r from-yellow-500 to-amber-500 h-full rounded-full transition-all duration-300"
-              style={{ width: `${Math.round((xp / xpNeeded) * 100)}%` }}
-            />
+
+          {/* Automatic Theme & Dark/Light Mode Selector */}
+          <div className="flex items-center gap-1 bg-zinc-950/90 border border-zinc-800 p-1 rounded-2xl shadow-lg relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setThemeMode("light")}
+              className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+                themeMode === "light"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20 scale-[1.05]"
+                  : "text-zinc-500 hover:text-zinc-350"
+              }`}
+              title="Thème Clair Cyber"
+            >
+              <Sun className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setThemeMode("dark")}
+              className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
+                themeMode === "dark"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20 scale-[1.05]"
+                  : "text-zinc-500 hover:text-zinc-350"
+              }`}
+              title="Thème Sombre Élite"
+            >
+              <Moon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setThemeMode("auto")}
+              className={`p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 px-2.5 ${
+                themeMode === "auto"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20 scale-[1.05]"
+                  : "text-zinc-500 hover:text-zinc-350"
+              }`}
+              title="Automatique (Détecte le système)"
+            >
+              <Monitor className="w-3.5 h-3.5" />
+              <span className="text-[9px] font-mono font-bold tracking-wider uppercase hidden sm:inline">Auto</span>
+            </button>
           </div>
-          <span className="text-xs font-bold text-zinc-400 font-mono">{Math.round((xp / xpNeeded) * 100)}%</span>
         </div>
       </header>
 
@@ -274,6 +718,18 @@ export default function App() {
           >
             <Sparkles className="w-4 h-4" />
             <span>Diagnostics & IA Plan</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("account")}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "account"
+                ? "bg-blue-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            }`}
+          >
+            <User className="w-4 h-4" />
+            <span>Mon Compte Cloud</span>
           </button>
 
           <button
@@ -561,6 +1017,22 @@ export default function App() {
                 badges={badges}
                 leaderboard={leaderboard}
                 onClaimXP={handleClaimXP}
+              />
+            </div>
+          )}
+
+          {/* Account Section view */}
+          {activeTab === "account" && (
+            <div className="space-y-6">
+              <AccountSection 
+                onboardingData={onboardingData} 
+                onUpdateOnboarding={handleUpdateOnboarding} 
+                sessions={sessions}
+                onUpdateSessions={setSessions}
+                level={level}
+                onUpdateLevel={setLevel}
+                xp={xp}
+                onUpdateXp={setXp}
               />
             </div>
           )}

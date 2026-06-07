@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net Default-Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Secure custom structures for identifying variables safely
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // User profile validation helper
+    function isValidUser(data) {
+      return data.userId is string 
+        && data.userId == request.auth.uid
+        && (!('email' in data) || data.email is string)
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128))
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 750))
+        && (!('level' in data) || data.level is number)
+        && (!('xp' in data) || data.xp is number)
+        && (!('xpNeeded' in data) || data.xpNeeded is number)
+        && (!('aiPlanText' in data) || (data.aiPlanText is string && data.aiPlanText.size() <= 250000))
+        && (!('onboardingData' in data) || data.onboardingData is map)
+        && (!('sessions' in data) || data.sessions is list)
+        && (!('consumedCal' in data) || data.consumedCal is number)
+        && (!('consumedProt' in data) || data.consumedProt is number)
+        && (!('consumedCarb' in data) || data.consumedCarb is number)
+        && (!('consumedLip' in data) || data.consumedLip is number)
+        && (!('challenges' in data) || data.challenges is list)
+        && (!('badges' in data) || data.badges is list)
+        && (!('connectedHealth' in data) || data.connectedHealth is list)
+        && (!('healthSyncResult' in data) || data.healthSyncResult is map)
+        && (!('lastSyncedAt' in data) || data.lastSyncedAt is string)
+        && (!('updatedAt' in data) || data.updatedAt is string);
+    }
+
+    // Action constraint check for updates to lock immutable values
+    function isProfileUpdate() {
+      return incoming().diff(existing()).affectedKeys().hasAny([
+        'level', 'xp', 'xpNeeded', 'onboardingData', 'aiPlanText', 
+        'sessions', 'consumedCal', 'consumedProt', 'consumedCarb', 
+        'consumedLip', 'challenges', 'badges', 'lastSyncedAt', 
+        'updatedAt', 'connectedHealth', 'healthSyncResult', 
+        'displayName', 'photoURL', 'email'
+      ]) && (!('email' in incoming()) || !('email' in existing()) || incoming().email == existing().email);
+    }
+
+    // Rules for User document
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      // Secure list query limits: only allow users to query their own document
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && isProfileUpdate();
+
+      // UserWorkout validation helper
+      function isValidUserWorkout(workData) {
+        return workData.sessionId is string
+          && workData.userId is string
+          && workData.userId == request.auth.uid
+          && workData.name is string
+          && workData.name.size() <= 256
+          && workData.date is string
+          && workData.completed is bool
+          && (!('duration' in workData) || workData.duration is number)
+          && (!('totalTonnage' in workData) || workData.totalTonnage is number)
+          && (!('totalVolume' in workData) || workData.totalVolume is number)
+          && (!('createdAt' in workData) || workData.createdAt is string);
+      }
+
+      // Workouts sub-collection
+      match /workouts/{workoutId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(workoutId) && isValidUserWorkout(incoming());
+        allow update: if isOwner(userId) && isValidId(workoutId) && isValidUserWorkout(incoming()) && incoming().sessionId == existing().sessionId;
+        allow delete: if isOwner(userId) && isValidId(workoutId);
+      }
+    }
+  }
+}
