@@ -1,43 +1,87 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BlogPost } from "../types";
 import { Heart, MessageSquare, Send, Users, Sparkles, UserPlus, Trophy, Share2, Dumbbell } from "lucide-react";
 
 export default function CommunityFeed() {
-  const [posts, setPosts] = useState<BlogPost[]>([
-    {
-      id: "post_0",
-      authorName: "Marc Vacher",
-      authorAvatar: "MV",
-      timeAgo: "Il y a 23 minutes",
-      content: "Nouvelle performance validée au Soulevé de Terre à la salle Athlétique ! Séance de Force Ondulatoire complete, 1RM calculé estimé à 160kg. Bravo à l'équipe !",
-      likes: 14,
-      comments: 3,
-      likedByMe: false,
-      tags: ["Powerlifting", "Deadlift"],
-      attachedWorkout: "Soulevé de Terre Traditional &bull; 4 séries x 5 reps @ 140kg",
-    },
-    {
-      id: "post_1",
-      authorName: "Sophie Martinez",
-      authorAvatar: "SM",
-      timeAgo: "Il y a 1 heure",
-      content: "Onboarding IA complété ! Mes objectifs de sèche ont été ajustés par l'algorithme : 2100 calories, 150g protéines. C'est parti pour 12 semaines intenses de transformation.",
-      likes: 28,
-      comments: 7,
-      likedByMe: true,
-      tags: ["Onboarding", "FitnessGoal"],
+  const [posts, setPosts] = useState<BlogPost[]>(() => {
+    try {
+      const stored = localStorage.getItem("sarcoforge_community_posts");
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      console.warn("Could not load community posts:", e);
     }
-  ]);
+    return [
+      {
+        id: "post_0",
+        authorName: "Marc Vacher",
+        authorAvatar: "MV",
+        timeAgo: "Il y a 23 minutes",
+        content: "Nouvelle performance validée au Soulevé de Terre à la salle Athlétique ! Séance de Force Ondulatoire complete, 1RM calculé estimé à 160kg. Bravo à l'équipe !",
+        likes: 14,
+        comments: 3,
+        likedByMe: false,
+        tags: ["Powerlifting", "Deadlift"],
+        attachedWorkout: "Soulevé de Terre Traditional &bull; 4 séries x 5 reps @ 140kg",
+      },
+      {
+        id: "post_1",
+        authorName: "Sophie Martinez",
+        authorAvatar: "SM",
+        timeAgo: "Il y a 1 heure",
+        content: "Onboarding IA complété ! Mes objectifs de sèche ont été ajustés par l'algorithme : 2100 calories, 150g protéines. C'est parti pour 12 semaines intenses de transformation.",
+        likes: 28,
+        comments: 7,
+        likedByMe: true,
+        tags: ["Onboarding", "FitnessGoal"],
+      }
+    ];
+  });
 
   const [newPostText, setNewPostText] = useState("");
   const [selectedTag, setSelectedTag] = useState("Tous");
+  const [appliedGroups, setAppliedGroups] = useState<string[]>([]);
 
   const [activeGroupInput, setActiveGroupInput] = useState<string | null>(null);
   const [commentInputs, setCommentInputs] = useState<{[key: string]: string}>({});
-  const [postsComments, setPostsComments] = useState<{[key: string]: string[]}>({
-    post_0: ["Magnifique barre Marc !", "Les dorsaux étaient d'acier."],
-    post_1: ["Super Sophie ! On va suivre ça de très près.", "N'hésite pas à consulter le coach IA."]
+  const [postsComments, setPostsComments] = useState<{[key: string]: string[]}>(() => {
+    try {
+      const stored = localStorage.getItem("sarcoforge_community_comments");
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      console.warn("Could not load community comments:", e);
+    }
+    return {
+      post_0: ["Magnifique barre Marc !", "Les dorsaux étaient d'acier."],
+      post_1: ["Super Sophie ! On va suivre ça de très près.", "N'hésite pas à consulter le coach IA."]
+    };
   });
+
+  // Persist posts list to localStorage on modifications
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_community_posts", JSON.stringify(posts));
+  }, [posts]);
+
+  // Persist comments list on alterations
+  useEffect(() => {
+    localStorage.setItem("sarcoforge_community_comments", JSON.stringify(postsComments));
+  }, [postsComments]);
+
+  // Consume any newly enqueued shared workout from WorkoutTracker
+  useEffect(() => {
+    try {
+      const queueRaw = localStorage.getItem("sarcoforge_shared_workouts_queue");
+      if (queueRaw) {
+        const queue: BlogPost[] = JSON.parse(queueRaw);
+        if (queue.length > 0) {
+          setPosts((prev) => [...queue, ...prev]);
+          // Clear queue since they are now absorbed
+          localStorage.setItem("sarcoforge_shared_workouts_queue", "[]");
+        }
+      }
+    } catch (e) {
+      console.warn("Could not parse shared workouts queue:", e);
+    }
+  }, []);
 
   const handleCreatePost = (e: React.FormEvent) => {
     e.preventDefault();
@@ -265,10 +309,19 @@ export default function CommunityFeed() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => alert(`Demande d'affiliation envoyée pour : ${group.name}`)}
-                  className="py-1 px-2.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white rounded-lg border border-blue-500/20 text-[10px] font-mono transition-all font-bold cursor-pointer"
+                  onClick={() => {
+                    if (!appliedGroups.includes(group.name)) {
+                      setAppliedGroups((prev) => [...prev, group.name]);
+                    }
+                  }}
+                  disabled={appliedGroups.includes(group.name)}
+                  className={`py-1 px-2.5 rounded-lg border text-[10px] font-mono transition-all font-bold cursor-pointer ${
+                    appliedGroups.includes(group.name)
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                      : "bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border-blue-500/20"
+                  }`}
                 >
-                  Postuler
+                  {appliedGroups.includes(group.name) ? "Postulé ✓" : "Postuler"}
                 </button>
               </div>
             ))}

@@ -35,7 +35,97 @@ export default function WorkoutTracker({
   const [activeConstraints, setActiveConstraints] = useState<string[]>(defaultConstraints);
   const [purchaseLog, setPurchaseLog] = useState<string[]>([]);
   const [selectedRoutineTab, setSelectedRoutineTab] = useState<"elite" | "custom">("elite");
-  const [bonusXpAlert, setBonusXpAlert] = useState<string | null>(null);
+  const [trackerNotification, setTrackerNotification] = useState<{
+    text: string;
+    type: "success" | "warning";
+  } | null>(null);
+
+  const showNotification = (text: string, type: "success" | "warning" = "success") => {
+    setTrackerNotification({ text, type });
+  };
+
+  useEffect(() => {
+    if (trackerNotification) {
+      const timer = setTimeout(() => setTrackerNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [trackerNotification]);
+
+  // Web Audio Synth Chime (no assets, ultra-performance)
+  const playModernChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      
+      const playTone = (freq: number, start: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, start);
+        gainNode.gain.setValueAtTime(0.12, start);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + duration);
+      };
+      
+      playTone(880, ctx.currentTime, 0.15); // A5 first
+      playTone(1320, ctx.currentTime + 0.08, 0.25); // E6 athletic dual-chime
+    } catch (e) {
+      console.warn("Audio Context beep error:", e);
+    }
+  };
+
+  // Real-time interactive Rest Timer States
+  const [restCountdown, setRestCountdown] = useState<number>(0);
+  const [restTotal, setRestTotal] = useState<number>(0);
+  const [restIsActive, setRestIsActive] = useState<boolean>(false);
+  const [restExerciseName, setRestExerciseName] = useState<string>("");
+  const [restIsMinimized, setRestIsMinimized] = useState<boolean>(false);
+  const [shareToCommunity, setShareToCommunity] = useState<boolean>(true);
+
+  useEffect(() => {
+    let intervalId: any = null;
+    if (restIsActive && restCountdown > 0) {
+      intervalId = setInterval(() => {
+        setRestCountdown((prev) => {
+          if (prev <= 1) {
+            setRestIsActive(false);
+            playModernChime();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [restIsActive, restCountdown]);
+
+  const startRestTimer = (seconds: number, exerciseName: string) => {
+    setRestCountdown(seconds);
+    setRestTotal(seconds);
+    setRestIsActive(true);
+    setRestExerciseName(exerciseName);
+    setRestIsMinimized(false);
+    showNotification(`⏱️ Récupération lancée : ${seconds}s pour ${exerciseName} !`, "success");
+  };
+
+  const adjustRestTimer = (secondsToAdd: number) => {
+    setRestCountdown((prev) => {
+      const newVal = Math.max(0, prev + secondsToAdd);
+      if (prev === 0 && secondsToAdd > 0) {
+        setRestIsActive(true);
+      }
+      if (newVal > restTotal) {
+        setRestTotal(newVal);
+      }
+      return newVal;
+    });
+  };
 
   // Échauffement IA module states
   const [warmupMuscleGroup, setWarmupMuscleGroup] = useState<string>("Pectoraux");
@@ -104,8 +194,7 @@ export default function WorkoutTracker({
       commonMistakes: ""
     });
     setShowCustomExerciseForm(false);
-    setBonusXpAlert(`🔥 Mouvement "${newEx.name}" forgé et ajouté à la bibliothèque avec succès !`);
-    setTimeout(() => setBonusXpAlert(null), 3000);
+    showNotification(`🔥 Mouvement "${newEx.name}" forgé et ajouté à la bibliothèque avec succès !`, "success");
   };
 
   // State for user-defined reusable workout templates
@@ -202,8 +291,7 @@ export default function WorkoutTracker({
 
       const data = await response.json();
       setWarmupResult(data.text);
-      setBonusXpAlert(`⚡ Échauffement Élite "${warmupMuscleGroup}" calibré ! +100 XP de Prévention Articulaire !`);
-      setTimeout(() => setBonusXpAlert(null), 4000);
+      showNotification(`⚡ Échauffement Élite "${warmupMuscleGroup}" calibré ! +100 XP de Prévention Articulaire !`, "success");
     } catch (err: any) {
       console.error(err);
       setWarmupError("Le serveur d'analyse biomécanique a mis trop de temps à répondre. Veuillez réessayer ou lancer en mode local.");
@@ -353,7 +441,7 @@ export default function WorkoutTracker({
 
     const alternateEx = mergedExercises.find(e => e.id === alternateExId);
     if (!alternateEx) {
-      alert("La variante corps libre pour cet exercice n'a pas pu être géolocalisée. Essayez de l'ajouter manuellement.");
+      showNotification("La variante corps libre pour cet exercice n'a pas pu être géolocalisée. Essayez de l'ajouter manuellement.", "warning");
       return;
     }
 
@@ -374,8 +462,7 @@ export default function WorkoutTracker({
     });
 
     setExpandedExerciseTips(null);
-    setBonusXpAlert(`🔄 "${originalEx.name}" remplacé par "${alternateEx.name}" au poids du corps d'élite ! Compatibilité de séance maximisée.`);
-    setTimeout(() => setBonusXpAlert(null), 4000);
+    showNotification(`🔄 "${originalEx.name}" remplacé par "${alternateEx.name}" au poids du corps d'élite ! Compatibilité de séance maximisée.`, "success");
   };
 
   // Simulated Pro Store equipment unlocked actions (V4.0 Part 4)
@@ -385,11 +472,7 @@ export default function WorkoutTracker({
     // Add to list, reward XP bonus
     setActiveEquipment((prev) => [...prev, equipmentName]);
     setPurchaseLog((prev) => [...prev, equipmentName]);
-    setBonusXpAlert(`🛍️ Équipement acheté: "${equipmentName}" ! +150 XP de Progrès matériel & 8 exercices débloqués !`);
-    
-    setTimeout(() => {
-      setBonusXpAlert(null);
-    }, 5000);
+    showNotification(`🛍️ Équipement acheté: "${equipmentName}" ! +150 XP de Progrès matériel & 8 exercices débloqués !`, "success");
   };
 
   const addExerciseToRoutine = (ex: Exercise) => {
@@ -473,6 +556,10 @@ export default function WorkoutTracker({
         if (log.exerciseId === exerciseId) {
           const updatedSets = log.sets.map((set) => {
             if (set.id === setId) {
+              if (field === "completed" && value === true && !set.completed) {
+                const restSeconds = log.restTime ?? 90;
+                startRestTimer(restSeconds, log.exerciseName);
+              }
               return { ...set, [field]: value };
             }
             return set;
@@ -518,7 +605,7 @@ export default function WorkoutTracker({
 
   const handleFinishWorkout = () => {
     if (activeSession.logs.length === 0) {
-      alert("Ajoutez au moins un exercice avant de finaliser l'entraînement !");
+      showNotification("Ajoutez au moins un exercice avant de finaliser l'entraînement !", "warning");
       return;
     }
 
@@ -532,6 +619,34 @@ export default function WorkoutTracker({
 
     // Calculate core XP reward: base 100 XP + bonuses
     const xpReward = 150 + Math.floor(cumulativeTonnage / 30);
+
+    // If community sharing toggled, add to sarcoforge_shared_workouts_queue in localStorage
+    if (shareToCommunity) {
+      const formattedTonnage = cumulativeTonnage.toLocaleString("fr-FR");
+      const postContent = `Séance complétée avec succès : "${finalSession.name}" ! J'ai bravé ${completedSetsCount} séries d'acier pour un tonnage de ${formattedTonnage} kg. La forge continue de gronder ! 🦾⚡`;
+      
+      const sharedPost = {
+        id: `post_workout_${Date.now()}`,
+        authorName: "Yohann-Athlète",
+        authorAvatar: "YA",
+        timeAgo: "À l'instant",
+        content: postContent,
+        likes: 0,
+        comments: 0,
+        likedByMe: false,
+        tags: ["Entraînement", "Performance"],
+        attachedWorkout: `${finalSession.name} &bull; ${completedSetsCount} séries validées &bull; Tonnage : ${formattedTonnage} kg`,
+      };
+
+      try {
+        const queueRaw = localStorage.getItem("sarcoforge_shared_workouts_queue") || "[]";
+        const queue = JSON.parse(queueRaw);
+        queue.push(sharedPost);
+        localStorage.setItem("sarcoforge_shared_workouts_queue", JSON.stringify(queue));
+      } catch (err) {
+        console.warn("Could not save shared workout to community queue:", err);
+      }
+    }
 
     onWorkoutCompleted(finalSession, xpReward);
 
@@ -758,13 +873,12 @@ export default function WorkoutTracker({
       completed: false
     });
 
-    setBonusXpAlert(`⚙️ Routine "${prog.name}" calibrée à 100% dans votre routine ! En avant athlète !`);
-    setTimeout(() => setBonusXpAlert(null), 5000);
+    showNotification(`⚙️ Routine "${prog.name}" calibrée à 100% dans votre routine ! En avant athlète !`, "success");
   };
 
   const handleSaveAsCustomRoutine = (routineName: string) => {
     if (activeSession.logs.length === 0) {
-      alert("Ajoutez au moins un exercice avant de sauvegarder le modèle !");
+      showNotification("Ajoutez au moins un exercice avant de sauvegarder le modèle !", "warning");
       return;
     }
     const finalName = routineName.trim() || `Routine Perso #${customRoutines.length + 1}`;
@@ -787,8 +901,7 @@ export default function WorkoutTracker({
     const updated = [...customRoutines, newRoutine];
     setCustomRoutines(updated);
     localStorage.setItem("sarcoforge_custom_routines", JSON.stringify(updated));
-    setBonusXpAlert(`✨ Le modèle de séance "${finalName}" a été sauvegardé dans vos routines !`);
-    setTimeout(() => setBonusXpAlert(null), 4000);
+    showNotification(`✨ Le modèle de séance "${finalName}" a été sauvegardé dans vos routines !`, "success");
   };
 
   const handleDeleteCustomRoutine = (progId: string, e: React.MouseEvent) => {
@@ -796,22 +909,29 @@ export default function WorkoutTracker({
     const updated = customRoutines.filter(p => p.id !== progId);
     setCustomRoutines(updated);
     localStorage.setItem("sarcoforge_custom_routines", JSON.stringify(updated));
-    setBonusXpAlert(`🗑️ Modèle de routine supprimé.`);
-    setTimeout(() => setBonusXpAlert(null), 3000);
+    showNotification(`🗑️ Modèle de routine supprimé.`, "warning");
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 relative">
       
-      {/* BONUS XP NOTIFICATION AREA */}
-      {bonusXpAlert && (
-        <div className="fixed bottom-6 right-6 z-50 bg-zinc-950 border-2 border-emerald-500/50 text-white p-5 rounded-2xl flex items-center gap-3.5 shadow-2xl animate-slideDown max-w-sm">
-          <div className="bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20 text-emerald-400">
-            <Sparkles className="w-5 h-5 animate-spin" />
+      {/* BONUS XP / WARNING NOTIFICATION AREA */}
+      {trackerNotification && (
+        <div className={`fixed bottom-6 right-6 z-50 bg-zinc-950 border-2 ${
+          trackerNotification.type === "warning" ? "border-red-500/50" : "border-emerald-500/50"
+        } text-white p-5 rounded-2xl flex items-center gap-3.5 shadow-2xl animate-slideDown max-w-sm transition-all duration-300`}>
+          <div className={`p-2.5 rounded-xl border ${
+            trackerNotification.type === "warning" ? "bg-red-500/10 border-red-500/20 text-red-400" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+          }`}>
+            {trackerNotification.type === "warning" ? <AlertTriangle className="w-5 h-5 animate-pulse" /> : <Sparkles className="w-5 h-5 animate-spin" />}
           </div>
           <div>
-            <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest font-mono">Succès Sportif</span>
-            <p className="text-[12px] text-zinc-300 leading-normal mt-0.5">{bonusXpAlert}</p>
+            <span className={`text-xs font-bold ${
+              trackerNotification.type === "warning" ? "text-red-400" : "text-emerald-400"
+            } uppercase tracking-widest font-mono`}>
+              {trackerNotification.type === "warning" ? "Attention" : "Notification"}
+            </span>
+            <p className="text-[12px] text-zinc-300 leading-normal mt-0.5">{trackerNotification.text}</p>
           </div>
         </div>
       )}
@@ -1505,8 +1625,7 @@ export default function WorkoutTracker({
                   onClick={() => {
                     setActiveLocation(loc.id);
                     // Generate minor feedback toast
-                    setBonusXpAlert(`📍 Lieu d'entraînement mis à jour : "${loc.id}" ! Programme et compatibilités ajustés.`);
-                    setTimeout(() => setBonusXpAlert(null), 3000);
+                    showNotification(`📍 Lieu d'entraînement mis à jour : "${loc.id}" ! Programme et compatibilités ajustés.`, "success");
                   }}
                   className={`py-2.5 px-3 rounded-2xl border text-left text-xs flex items-center gap-2 transition-all duration-300 cursor-pointer ${
                     isSelected 
@@ -1548,13 +1667,12 @@ export default function WorkoutTracker({
                         if (hasEquip) {
                           // Remove all synonyms
                           setActiveEquipment((prev) => prev.filter((eq) => !item.synonyms.includes(eq)));
-                          setBonusXpAlert(`⚙️ Matériel désactivé : "${item.label}".`);
+                          showNotification(`⚙️ Matériel désactivé : "${item.label}".`, "warning");
                         } else {
                           // Add all synonyms
                           setActiveEquipment((prev) => [...prev, ...item.synonyms]);
-                          setBonusXpAlert(`💪 Matériel activé : "${item.label}" + exercices débloqués !`);
+                          showNotification(`💪 Matériel activé : "${item.label}" + exercices débloqués !`, "success");
                         }
-                        setTimeout(() => setBonusXpAlert(null), 3000);
                       }}
                       className={`text-[11px] px-3.5 py-2 rounded-full border transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
                         hasEquip 
@@ -1965,16 +2083,131 @@ export default function WorkoutTracker({
         </div>
 
         {activeSession.logs.length > 0 && (
-          <div className="flex justify-end mt-4">
+          <div className="flex flex-col sm:flex-row items-center sm:justify-between gap-4 mt-6 p-4 bg-zinc-950/40 border border-zinc-900 rounded-3xl backdrop-blur-md">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none group text-left">
+              <input
+                type="checkbox"
+                checked={shareToCommunity}
+                onChange={(e) => setShareToCommunity(e.target.checked)}
+                className="w-4 h-4 bg-zinc-900 border-zinc-800 rounded checked:bg-blue-600 focus:ring-0 cursor-pointer accent-blue-600"
+              />
+              <div>
+                <span className="text-xs font-bold text-zinc-300 block group-hover:text-white transition">Partager sur la Forge Communauté</span>
+                <span className="text-[10px] text-zinc-500 block">Publie un bilan de force (volume, tonnage) pour inspirer le club</span>
+              </div>
+            </label>
             <button
               onClick={handleFinishWorkout}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs px-6 py-3 rounded-xl flex items-center gap-2 shadow-[0_4px_15px_rgba(59,130,246,0.3)] cursor-pointer hover:scale-101 duration-150 transition-all border border-blue-500/10"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs px-6 py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(59,130,246,0.3)] cursor-pointer hover:scale-101 duration-150 transition-all border border-blue-500/10 shrink-0"
             >
               <Award className="w-5 h-5 text-yellow-300 animate-bounce" /> Compléter l'Entraînement et Gagner des XP !
             </button>
           </div>
         )}
       </div>
+
+      {/* Sleek Floating Rest Timer Overlay */}
+      {restCountdown > 0 && (
+        <div className={`fixed bottom-6 right-6 max-w-sm bg-zinc-950/95 border ${restIsActive ? 'border-cyan-500/40' : 'border-zinc-805'} p-4 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] backdrop-blur-md z-50 flex items-center gap-4 transition-all duration-350 ${restIsMinimized ? 'w-14 h-14 overflow-hidden rounded-full p-0 justify-center' : 'w-80'}`}>
+          {restIsMinimized ? (
+            <button
+              onClick={() => setRestIsMinimized(false)}
+              className="w-full h-full flex flex-col items-center justify-center text-cyan-400 focus:outline-none cursor-pointer"
+              title="Agrandir le chronomètre"
+            >
+              <span className="text-[10px] font-black font-mono">{restCountdown}s</span>
+              <RefreshCw className="w-3 h-3 animate-spin text-zinc-500 mt-0.5" />
+            </button>
+          ) : (
+            <>
+              {/* Left Column: Sleek radial progression */}
+              <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="26"
+                    strokeWidth="3.5"
+                    stroke="#18181b"
+                    fill="transparent"
+                  />
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="26"
+                    strokeWidth="3.5"
+                    stroke={restIsActive ? "#06b6d4" : "#4b5563"}
+                    fill="transparent"
+                    strokeDasharray={163.3}
+                    strokeDashoffset={163.3 - (163.3 * restCountdown) / (restTotal || 90)}
+                    strokeLinecap="round"
+                    className="transition-all duration-1000"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center font-mono select-none">
+                  <span className="text-sm font-black text-white">{restCountdown}</span>
+                  <span className="text-[7.5px] text-zinc-500 uppercase">sec</span>
+                </div>
+              </div>
+
+              {/* Middle Column: Details & CTA */}
+              <div className="flex-1 truncate text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                  <span className="text-[9px] font-mono font-bold text-cyan-400/80 tracking-wider">CHRONO RÉCUP ACTIVÉ</span>
+                </div>
+                <h4 className="text-xs font-extrabold text-white truncate mt-0.5 uppercase tracking-wide">
+                  {restExerciseName || "SarcoForge Récup"}
+                </h4>
+                
+                {/* Timer controllers */}
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    onClick={() => adjustRestTimer(-10)}
+                    className="p-1 hover:bg-zinc-900 border border-zinc-850 hover:border-zinc-700 text-zinc-400 rounded text-[9px] font-mono font-bold cursor-pointer transition select-none"
+                    title="-10 secondes"
+                  >
+                    -10s
+                  </button>
+                  <button
+                    onClick={() => adjustRestTimer(30)}
+                    className="p-1 hover:bg-zinc-900 border border-zinc-850 hover:border-zinc-700 text-zinc-400 rounded text-[9px] font-mono font-bold cursor-pointer transition select-none"
+                    title="+30 secondes"
+                  >
+                    +30s
+                  </button>
+                  <button
+                    onClick={() => setRestIsActive(!restIsActive)}
+                    className={`px-2 py-1 ${restIsActive ? 'bg-zinc-900 border border-zinc-800 text-zinc-350' : 'bg-cyan-500 text-zinc-950 font-black'} rounded text-[9px] cursor-pointer transition select-none`}
+                  >
+                    {restIsActive ? "Pause" : "Play"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column: Close/Minimize controls */}
+              <div className="flex flex-col gap-2 self-start shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setRestIsMinimized(true)}
+                  className="text-zinc-600 hover:text-zinc-300 transition cursor-pointer text-[11px] font-bold font-mono border border-transparent hover:border-zinc-800 p-0.5 rounded select-none leading-none"
+                  title="Réduire"
+                >
+                  _
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRestCountdown(0)}
+                  className="text-zinc-650 hover:text-red-400 transition cursor-pointer text-[12px] font-mono border border-transparent hover:border-zinc-800 p-0.5 rounded select-none leading-none"
+                  title="Annuler"
+                >
+                  ×
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

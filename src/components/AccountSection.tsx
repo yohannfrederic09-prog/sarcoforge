@@ -80,6 +80,7 @@ export default function AccountSection({
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [tempSessionState, setTempSessionState] = useState<WorkoutSession | null>(null);
   const [retroSuccessAlert, setRetroSuccessAlert] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const startEditingSession = (session: WorkoutSession) => {
     setEditingSessionId(session.id);
@@ -103,11 +104,16 @@ export default function AccountSection({
   };
 
   const handleDeleteSessionPermanently = (sessionId: string) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer définitivement cette séance d'entraînement de votre historique ?")) return;
+    if (confirmDeleteId !== sessionId) {
+      setConfirmDeleteId(sessionId);
+      setTimeout(() => setConfirmDeleteId(null), 4000); // 4-second confirmation window
+      return;
+    }
     const updated = sessions.filter(s => s.id !== sessionId);
     onUpdateSessions(updated);
+    setConfirmDeleteId(null);
     setRetroSuccessAlert("Séance supprimée de votre historique !");
-    setTimeout(() => setRetroSuccessAlert(null), 3050);
+    setTimeout(() => setRetroSuccessAlert(null), 3500);
   };
 
   const handleExtractSessionAsRoutine = (session: WorkoutSession) => {
@@ -131,9 +137,11 @@ export default function AccountSection({
       };
       const updated = [...currentRoutines, newRoutine];
       localStorage.setItem("sarcoforge_custom_routines", JSON.stringify(updated));
-      alert(`✨ Succès ! La routine "${newRoutine.name}" est archivée et jouable dans votre Forge !`);
+      setRetroSuccessAlert(`✨ Routine "${newRoutine.name}" archivée dans vos modèles !`);
+      setTimeout(() => setRetroSuccessAlert(null), 4000);
     } catch {
-      alert("Erreur lors de l'extraction de la routine.");
+      setRetroSuccessAlert("Erreur lors de l'extraction de la routine.");
+      setTimeout(() => setRetroSuccessAlert(null), 4000);
     }
   };
 
@@ -1202,10 +1210,14 @@ export default function AccountSection({
                         <button
                           type="button"
                           onClick={() => handleDeleteSessionPermanently(session.id)}
-                          className="px-3 py-1.5 rounded-xl border border-red-900/20 hover:border-red-900/50 bg-zinc-955 hover:bg-red-950/20 text-red-550 text-red-400 text-[10px] font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                          className={`px-3 py-1.5 rounded-xl border text-[10px] font-bold flex items-center gap-1.5 cursor-pointer transition-all duration-300 ${
+                            confirmDeleteId === session.id
+                              ? "bg-red-650/40 border-red-550 text-white animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.25)]"
+                              : "border-red-900/20 hover:border-red-900/50 bg-zinc-955 hover:bg-red-950/20 text-red-400"
+                          }`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          <span>Supprimer</span>
+                          <span>{confirmDeleteId === session.id ? "Confirmer la suppression ?" : "Supprimer"}</span>
                         </button>
                       </div>
                     </div>

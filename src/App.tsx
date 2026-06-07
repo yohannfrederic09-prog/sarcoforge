@@ -10,6 +10,7 @@ import GamificationCenter from "./components/GamificationCenter";
 import AdminPanel from "./components/AdminPanel";
 import DevOpsConsole from "./components/DevOpsConsole";
 import AccountSection from "./components/AccountSection";
+import CyberModal from "./components/CyberModal";
 import { auth, db, handleFirestoreError, OperationType } from "./lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
@@ -110,6 +111,41 @@ export default function App() {
     return val ? parseInt(val, 10) : 1000;
   });
   const [showLevelUpToast, setShowLevelUpToast] = useState(false);
+
+  // Unified CyberModal global configuration state
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "alert" | "confirm" | "success" | "info";
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "alert"
+  });
+
+  const showModal = (options: {
+    title: string;
+    message: string;
+    type?: "alert" | "confirm" | "success" | "info";
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
+  }) => {
+    setModalConfig({
+      isOpen: true,
+      title: options.title,
+      message: options.message,
+      type: options.type || "alert",
+      confirmText: options.confirmText,
+      cancelText: options.cancelText,
+      onConfirm: options.onConfirm
+    });
+  };
 
   // Global Workout state logs
   const [sessions, setSessions] = useState<WorkoutSession[]>(() => {
@@ -733,78 +769,126 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => onboardingCompleted ? setActiveTab("workouts") : alert("Veuillez d'abord compléter l'Onboarding IA pour déverrouiller la plateforme.")}
+            onClick={() => {
+              if (onboardingCompleted) setActiveTab("workouts");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Veuillez compléter votre diagnostic d'onboarder biométrique ('Diagnostics & IA Plan') afin de déverrouiller le suivi intelligent de vos séances.",
+                  type: "info"
+                });
+              }
+            }}
             className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
               activeTab === "workouts"
                 ? "bg-blue-600/10 text-blue-400 border border-blue-500/15"
                 : "text-zinc-400 hover:text-white border border-transparent"
-            } ${!onboardingCompleted ? "opacity-40 cursor-not-allowed" : ""}`}
-            disabled={!onboardingCompleted}
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
           >
             <Dumbbell className="w-4 h-4" />
             <span>Suivi d'Entraînement</span>
           </button>
 
           <button
-            onClick={() => onboardingCompleted ? setActiveTab("coach") : alert("Veuillez d'abord compléter l'Onboarding IA pour déverrouiller la plateforme.")}
+            onClick={() => {
+              if (onboardingCompleted) setActiveTab("coach");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Le module Coach IA Ultra Avancé a besoin de calibrer vos données physiologiques avant de lancer l'analyse biomécanique en temps réel. Complétez votre onboarding !",
+                  type: "info"
+                });
+              }
+            }}
             className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
               activeTab === "coach"
                 ? "bg-blue-600/10 text-blue-400 border border-blue-500/15"
                 : "text-zinc-400 hover:text-white border border-transparent"
-            } ${!onboardingCompleted ? "opacity-40 cursor-not-allowed" : ""}`}
-            disabled={!onboardingCompleted}
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
           >
             <MessageSquare className="w-4 h-4" />
             <span>Coach IA Ultra Avancé</span>
           </button>
 
           <button
-            onClick={() => onboardingCompleted ? setActiveTab("nutrition") : alert("Veuillez d'abord compléter l'Onboarding IA pour déverrouiller la plateforme.")}
+            onClick={() => {
+              if (onboardingCompleted) setActiveTab("nutrition");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "L'indice d'absorption moléculaire, le plan nutritionnel et l'accès à la base d'aliments de pointe requièrent l'évaluation initiale d'onboarding.",
+                  type: "info"
+                });
+              }
+            }}
             className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
               activeTab === "nutrition"
                 ? "bg-blue-600/10 text-blue-400 border border-blue-500/15"
                 : "text-zinc-400 hover:text-white border border-transparent"
-            } ${!onboardingCompleted ? "opacity-40 cursor-not-allowed" : ""}`}
-            disabled={!onboardingCompleted}
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
           >
             <Utensils className="w-4 h-4" />
             <span>Nutrition & Tracker</span>
           </button>
 
           <button
-            onClick={() => onboardingCompleted ? setActiveTab("analytics") : alert("Veuillez d'abord compléter l'Onboarding IA pour déverrouiller la plateforme.")}
+            onClick={() => {
+              if (onboardingCompleted) setActiveTab("analytics");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Les graphiques prévisionnels et l'analyseur de tonnages attendent l'évaluation biométrique pour commencer à modéliser vos projections de force.",
+                  type: "info"
+                });
+              }
+            }}
             className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
               activeTab === "analytics"
                 ? "bg-blue-600/10 text-blue-400 border border-blue-500/15"
                 : "text-zinc-400 hover:text-white border border-transparent"
-            } ${!onboardingCompleted ? "opacity-40 cursor-not-allowed" : ""}`}
-            disabled={!onboardingCompleted}
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
           >
             <BarChart3 className="w-4 h-4" />
             <span>Analyses & Projections</span>
           </button>
 
           <button
-            onClick={() => onboardingCompleted ? setActiveTab("community") : alert("Veuillez d'abord compléter l'Onboarding IA pour déverrouiller la plateforme.")}
+            onClick={() => {
+              if (onboardingCompleted) setActiveTab("community");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Pour préserver la qualité de la communauté d'élite, vous devez valider vos calibrages biométriques de départ. Rejoignez la forge !",
+                  type: "info"
+                });
+              }
+            }}
             className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
               activeTab === "community"
                 ? "bg-blue-600/10 text-blue-400 border border-blue-500/15"
                 : "text-zinc-400 hover:text-white border border-transparent"
-            } ${!onboardingCompleted ? "opacity-40 cursor-not-allowed" : ""}`}
-            disabled={!onboardingCompleted}
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
           >
             <Users className="w-4 h-4" />
             <span>Club Communauté</span>
           </button>
 
           <button
-            onClick={() => onboardingCompleted ? setActiveTab("gamification") : alert("Veuillez d'abord compléter l'Onboarding IA pour déverrouiller la plateforme.")}
+            onClick={() => {
+              if (onboardingCompleted) setActiveTab("gamification");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Votre feuille de personnage de force (Feuille d'Athlète RPG) et le suivi des quêtes de tonnage s'activent après complétion du diagnostic.",
+                  type: "info"
+                });
+              }
+            }}
             className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
               activeTab === "gamification"
                 ? "bg-blue-600/10 text-blue-400 border border-blue-500/15"
                 : "text-zinc-400 hover:text-white border border-transparent"
-            } ${!onboardingCompleted ? "opacity-40 cursor-not-allowed" : ""}`}
-            disabled={!onboardingCompleted}
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
           >
             <Trophy className="w-4 h-4" />
             <span>Quêtes & Défis RPG</span>
@@ -840,15 +924,26 @@ export default function App() {
           {onboardingCompleted && (
             <button
               onClick={() => {
-                if (confirm("Réinitialiser l'application ? Tout l'historique sera effacé.")) {
-                  setOnboardingCompleted(false);
-                  setOnboardingData(null);
-                  setActiveTab("onboarding");
-                  setLevel(1);
-                  setXp(350);
-                }
+                showModal({
+                  title: "Réinitialisation Algorithmique",
+                  message: "Attention, cette action est irréversible. Tout l'historique de votre biométrie, vos repas, vos quêtes actives, et vos séances seront définitivement détruits du stockage local.",
+                  type: "confirm",
+                  confirmText: "Tout effacer",
+                  cancelText: "Conserver",
+                  onConfirm: () => {
+                    setOnboardingCompleted(false);
+                    setOnboardingData(null);
+                    setActiveTab("onboarding");
+                    setLevel(1);
+                    setXp(350);
+                    localStorage.removeItem("sarcoforge_onboardingCompleted");
+                    localStorage.removeItem("sarcoforge_onboardingData");
+                    localStorage.removeItem("sarcoforge_sessions");
+                    localStorage.removeItem("sarcoforge_logged_meals");
+                  }
+                });
               }}
-              className="mt-auto w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 text-red-500 hover:bg-red-500/5 hover:text-red-400 transition-all border border-transparent"
+              className="mt-auto w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 text-red-500 hover:bg-red-500/5 hover:text-red-400 transition-all border border-transparent cursor-pointer"
             >
               <LogOut className="w-4 h-4 text-red-500" />
               <span>Réinitialiser Diagnos</span>
@@ -1070,6 +1165,18 @@ export default function App() {
           <span>Database status: Connected postgresql</span>
         </div>
       </footer>
+
+      {/* Futuristic Cybernetic Dialog Systems overlay */}
+      <CyberModal
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
+        onConfirm={modalConfig.onConfirm}
+        onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

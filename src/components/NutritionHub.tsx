@@ -24,7 +24,8 @@ import {
   ShoppingCart, 
   Trash, 
   Compass, 
-  Dumbbell 
+  Dumbbell,
+  Loader2 
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -136,6 +137,79 @@ export default function NutritionHub({ onMacrosUpdated }: NutritionHubProps) {
 
   // Custom grocery items
   const [groceryInput, setGroceryInput] = useState("");
+  const [nutritionSuccessToast, setNutritionSuccessToast] = useState<string | null>(null);
+
+  const triggerNutritionToast = (text: string) => {
+    setNutritionSuccessToast(text);
+  };
+
+  useEffect(() => {
+    if (nutritionSuccessToast) {
+      const timer = setTimeout(() => setNutritionSuccessToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [nutritionSuccessToast]);
+
+  // AI Plate Analyser States
+  const [aiPlateDescription, setAiPlateDescription] = useState("");
+  const [aiPlateLoading, setAiPlateLoading] = useState(false);
+  const [aiPlateError, setAiPlateError] = useState<string | null>(null);
+  const [aiPlateResult, setAiPlateResult] = useState<{
+    name: string;
+    calories: number;
+    proteins: number;
+    carbs: number;
+    lipids: number;
+    analysis: string;
+  } | null>(null);
+
+  const handleAnalyzePlate = async () => {
+    if (!aiPlateDescription.trim()) return;
+    setAiPlateLoading(true);
+    setAiPlateError(null);
+    setAiPlateResult(null);
+
+    try {
+      const response = await fetch("/api/analyze-plate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: aiPlateDescription }),
+      });
+
+      if (!response.ok) {
+        throw new Error("L'analyseur d'assiette IA n'a pas répondu.");
+      }
+
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setAiPlateResult(result);
+      triggerNutritionToast("⚡ Assiette analysée avec succès par l'IA !");
+    } catch (err: any) {
+      console.error(err);
+      setAiPlateError(err.message || "Impossible de joindre le service de diététique IA secondaire.");
+    } finally {
+      setAiPlateLoading(false);
+    }
+  };
+
+  const acceptAiPlateResult = () => {
+    if (!aiPlateResult) return;
+    addMeal(
+      aiPlateResult.name,
+      aiPlateResult.calories,
+      aiPlateResult.proteins,
+      aiPlateResult.carbs,
+      aiPlateResult.lipids,
+      "Déjeuner"
+    );
+    setAiPlateResult(null);
+    setAiPlateDescription("");
+    triggerNutritionToast("🍎 Repas IA consigné avec succès dans votre journal de bord !");
+  };
+
   const [groceries, setGroceries] = useState(() => {
     try {
       const stored = localStorage.getItem("sarcoforge_groceries");
@@ -439,7 +513,7 @@ export default function NutritionHub({ onMacrosUpdated }: NutritionHubProps) {
         "Encas"
       );
       // Beautiful feedback effect
-      alert(`Recette moléculaire "${synthesizedRecipe.name}" injectée avec succès dans votre journal de bord !`);
+      triggerNutritionToast(`Recette moléculaire "${synthesizedRecipe.name}" injectée dans votre journal !`);
     }
   };
 
@@ -451,7 +525,7 @@ export default function NutritionHub({ onMacrosUpdated }: NutritionHubProps) {
         tag: "SYNTH-RECIPE"
       }));
       setGroceries((prev) => [...prev, ...added]);
-      alert("Composants de synthèse injectés dans votre Liste de Courses !");
+      triggerNutritionToast("Composants de synthèse injectés dans votre Liste de Courses !");
     }
   };
 
@@ -1053,87 +1127,179 @@ export default function NutritionHub({ onMacrosUpdated }: NutritionHubProps) {
             </div>
           </div>
 
-          {/* SÉCURISATION ET ADDITION DIRECTE (MANUAL DIRECT ENTRY) */}
-          <div className="bg-zinc-950/90 border border-zinc-800/80 rounded-3xl p-5 backdrop-blur-md shadow-[0_0_40px_rgba(0,0,0,0.5)]">
-            <h3 className="text-xs font-black text-white uppercase tracking-widest pb-3 border-b border-zinc-900 mb-3 block">
-              Enregistrer un Aliment Cyber
-            </h3>
+          {/* COLUMN 2 WITH STACK */}
+          <div className="space-y-6">
 
-            <form onSubmit={handleManualAdd} className="space-y-3 font-mono text-[11px]">
-              <div>
-                <label className="text-zinc-500 uppercase text-[8.5px] block mb-1">Nom du plat d'effort</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Riz Basmati Bio, Blanc de Poulet..."
-                  value={newMealName}
-                  onChange={(e) => setNewMealName(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-2 px-3 focus:outline-none focus:border-blue-500 font-sans text-xs"
+            {/* ASSISTANT IA DILIGENT - DIÉTÈTICIEN DU SPORT */}
+            <div className="bg-gradient-to-br from-zinc-950 to-zinc-900 border border-zinc-800 rounded-3xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-cyan-400 animate-pulse" />
+                <div>
+                  <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider block">Nutrition Autonome IA v2.0</span>
+                  <h3 className="text-xs font-black text-white uppercase mt-0.5 tracking-tight">Analyseur d'Assiette IA</h3>
+                </div>
+              </div>
+
+              <p className="text-[10.5px] text-zinc-400 leading-normal font-sans">
+                Décrivez simplement ce que vous venez de manger (portion, ingrédients). Notre IA estime en direct l'apport en calories et macronutriments pour l'ajouter à vos logs.
+              </p>
+
+              <div className="space-y-3">
+                <textarea
+                  placeholder="Ex: Un filet de poulet grillé (130g) avec du riz basmati cuit (200g) et un filet d'huile d'olive."
+                  value={aiPlateDescription}
+                  onChange={(e) => setAiPlateDescription(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-850 rounded-2xl p-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500 h-20 resize-none font-sans"
                 />
+
+                <button
+                  type="button"
+                  onClick={handleAnalyzePlate}
+                  disabled={aiPlateLoading || !aiPlateDescription.trim()}
+                  className="w-full bg-cyan-600 hover:bg-cyan-500 text-zinc-950 font-bold text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 duration-150 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(6,182,212,0.15)] cursor-pointer"
+                >
+                  {aiPlateLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-zinc-950" />
+                      <span>Analyse de l'assiette cinétique...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-zinc-950" />
+                      <span>Analyser mon repas</span>
+                    </>
+                  )}
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-zinc-500 uppercase text-[8.5px] block mb-1">Calories (kcal)</label>
-                  <input
-                    type="number"
-                    value={newMealCal}
-                    onChange={(e) => setNewMealCal(parseInt(e.target.value) || 0)}
-                    className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-2 px-3 focus:outline-none focus:border-blue-500 text-center"
-                  />
+              {aiPlateError && (
+                <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl text-[10.5px] text-red-400 font-mono">
+                  {aiPlateError}
                 </div>
-                <div>
-                  <label className="text-zinc-500 uppercase text-[8.5px] block mb-1">Période d'apport</label>
-                  <select
-                    value={newMealType}
-                    onChange={(e) => setNewMealType(e.target.value as any)}
-                    className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-2 px-2 focus:outline-none focus:border-blue-500 text-xs font-sans"
+              )}
+
+              {aiPlateResult && (
+                <div className="border border-zinc-800 bg-zinc-950/60 p-4 rounded-2xl space-y-3.5 animate-fadeIn">
+                  <div className="flex justify-between items-start">
+                    <div className="truncate pr-2">
+                      <h4 className="text-xs font-bold text-white uppercase tracking-tight truncate">{aiPlateResult.name}</h4>
+                      <span className="text-[8px] font-mono text-zinc-500 block">DÉTEC. SPORT DIET</span>
+                    </div>
+                    <span className="text-xs font-black text-cyan-400 font-mono shrink-0">{aiPlateResult.calories} kcal</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center font-mono text-[9px] bg-zinc-900/40 p-2.5 rounded-xl border border-zinc-850">
+                    <div>
+                      <span className="text-zinc-500 uppercase block text-[7.5px]">Prots</span>
+                      <strong className="text-blue-400 text-xs block mt-0.5">{aiPlateResult.proteins}g</strong>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 uppercase block text-[7.5px]">Glucides</span>
+                      <strong className="text-indigo-400 text-xs block mt-0.5">{aiPlateResult.carbs}g</strong>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 uppercase block text-[7.5px]">Lipides</span>
+                      <strong className="text-amber-500 text-xs block mt-0.5">{aiPlateResult.lipids}g</strong>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-zinc-400 leading-normal italic font-sans border-l border-cyan-500/30 pl-2">
+                    "{aiPlateResult.analysis}"
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={acceptAiPlateResult}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 rounded-xl flex items-center justify-center gap-1 transition-all cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.1)]"
                   >
-                    <option>Petit-déjeuner</option>
-                    <option>Déjeuner</option>
-                    <option>Dîner</option>
-                    <option>Encas</option>
-                  </select>
+                    <span>Ajouter à mes logs (+{aiPlateResult.calories} kcal)</span>
+                  </button>
                 </div>
-              </div>
+              )}
+            </div>
 
-              <div className="grid grid-cols-3 gap-1.5">
-                <div>
-                  <label className="text-blue-400 uppercase text-[8.5px] block mb-1 text-center font-bold">Prot (g)</label>
-                  <input
-                    type="number"
-                    value={newMealProt}
-                    onChange={(e) => setNewMealProt(parseInt(e.target.value) || 0)}
-                    className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-1.5 px-2 focus:outline-none focus:border-blue-500 text-center text-xs font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="text-indigo-400 uppercase text-[8.5px] block mb-1 text-center font-bold">Glu (g)</label>
-                  <input
-                    type="number"
-                    value={newMealCarb}
-                    onChange={(e) => setNewMealCarb(parseInt(e.target.value) || 0)}
-                    className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-1.5 px-2 focus:outline-none focus:border-blue-500 text-center text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-amber-500 uppercase text-[8.5px] block mb-1 text-center font-bold">Lip (g)</label>
-                  <input
-                    type="number"
-                    value={newMealLip}
-                    onChange={(e) => setNewMealLip(parseInt(e.target.value) || 0)}
-                    className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-1.5 px-2 focus:outline-none focus:border-blue-500 text-center text-xs"
-                  />
-                </div>
-              </div>
+            {/* SÉCURISATION ET ADDITION DIRECTE (MANUAL DIRECT ENTRY) */}
+            <div className="bg-zinc-950/90 border border-zinc-800/80 rounded-3xl p-5 backdrop-blur-md shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+              <h3 className="text-xs font-black text-white uppercase tracking-widest pb-3 border-b border-zinc-900 mb-3 block">
+                Enregistrer un Aliment Cyber
+              </h3>
 
-              <button
-                type="submit"
-                disabled={!newMealName.trim()}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black font-sans uppercase tracking-widest cursor-pointer transition-all disabled:opacity-40 shadow-[0_0_12px_rgba(37,99,235,0.2)] mt-1"
-              >
-                Inscrire au Journal de Bord
-              </button>
-            </form>
+              <form onSubmit={handleManualAdd} className="space-y-3 font-mono text-[11px]">
+                <div>
+                  <label className="text-zinc-500 uppercase text-[8.5px] block mb-1">Nom du plat d'effort</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Riz Basmati Bio, Blanc de Poulet..."
+                    value={newMealName}
+                    onChange={(e) => setNewMealName(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-2 px-3 focus:outline-none focus:border-blue-500 font-sans text-xs"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-zinc-500 uppercase text-[8.5px] block mb-1">Calories (kcal)</label>
+                    <input
+                      type="number"
+                      value={newMealCal}
+                      onChange={(e) => setNewMealCal(parseInt(e.target.value) || 0)}
+                      className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-2 px-3 focus:outline-none focus:border-blue-500 text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-zinc-500 uppercase text-[8.5px] block mb-1">Période d'apport</label>
+                    <select
+                      value={newMealType}
+                      onChange={(e) => setNewMealType(e.target.value as any)}
+                      className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-2 px-2 focus:outline-none focus:border-blue-500 text-xs font-sans"
+                    >
+                      <option>Petit-déjeuner</option>
+                      <option>Déjeuner</option>
+                      <option>Dîner</option>
+                      <option>Encas</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5">
+                  <div>
+                    <label className="text-blue-400 uppercase text-[8.5px] block mb-1 text-center font-bold">Prot (g)</label>
+                    <input
+                      type="number"
+                      value={newMealProt}
+                      onChange={(e) => setNewMealProt(parseInt(e.target.value) || 0)}
+                      className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-1.5 px-2 focus:outline-none focus:border-blue-500 text-center text-xs font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-indigo-400 uppercase text-[8.5px] block mb-1 text-center font-bold">Glu (g)</label>
+                    <input
+                      type="number"
+                      value={newMealCarb}
+                      onChange={(e) => setNewMealCarb(parseInt(e.target.value) || 0)}
+                      className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-1.5 px-2 focus:outline-none focus:border-blue-500 text-center text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-amber-500 uppercase text-[8.5px] block mb-1 text-center font-bold">Lip (g)</label>
+                    <input
+                      type="number"
+                      value={newMealLip}
+                      onChange={(e) => setNewMealLip(parseInt(e.target.value) || 0)}
+                      className="w-full bg-zinc-900 border border-zinc-850 text-white rounded-xl py-1.5 px-2 focus:outline-none focus:border-blue-500 text-center text-xs"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!newMealName.trim()}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black font-sans uppercase tracking-widest cursor-pointer transition-all disabled:opacity-40 shadow-[0_0_12px_rgba(37,99,235,0.2)] mt-1"
+                >
+                  Inscrire au Journal de Bord
+                </button>
+              </form>
+            </div>
           </div>
         </div>
 
@@ -1239,6 +1405,21 @@ export default function NutritionHub({ onMacrosUpdated }: NutritionHubProps) {
         </div>
 
       </div>
+
+      {/* FLOAT SLIDE-IN SUCCESS NOTIFICATION HUB */}
+      {nutritionSuccessToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#060608] border border-blue-500/30 text-white p-4.5 rounded-2xl flex items-center gap-3.5 shadow-2xl animate-slideDown max-w-sm transition-all duration-300">
+          <div className="p-2.5 rounded-xl border bg-blue-500/10 border-blue-500/20 text-blue-400">
+            <Check className="w-4 h-4" strokeWidth={3} />
+          </div>
+          <div>
+            <span className="text-[10px] font-bold text-blue-450 uppercase tracking-widest font-mono block">
+              Synthèse Réussie
+            </span>
+            <p className="text-[11px] text-zinc-300 leading-normal mt-0.5">{nutritionSuccessToast}</p>
+          </div>
+        </div>
+      )}
 
     </div>
   );

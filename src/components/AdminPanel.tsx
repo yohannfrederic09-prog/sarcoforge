@@ -9,6 +9,7 @@ export default function AdminPanel() {
   const [newExMuscle, setNewExMuscle] = useState("Pectoraux");
   const [newExEquip, setNewExEquip] = useState("Barre");
   const [newExDiff, setNewExDiff] = useState<"Débutant" | "Intermédiaire" | "Avancé">("Intermédiaire");
+  const [adminNotification, setAdminNotification] = useState<string | null>(null);
 
   // Mock operational kpi logs
   const stats = [
@@ -36,8 +37,10 @@ export default function AdminPanel() {
     };
 
     setExercises((prev) => [...prev, freshEx]);
+    const storedName = newExName;
     setNewExName("");
-    alert(`Nouvel exercice '${newExName}' enregistré avec succès dans le back-office !`);
+    setAdminNotification(`Nouvel exercice '${storedName}' enregistré avec succès dans le back-office !`);
+    setTimeout(() => setAdminNotification(null), 5000);
   };
 
   return (
@@ -92,6 +95,12 @@ export default function AdminPanel() {
           <h3 className="text-sm font-bold text-white uppercase tracking-wider pb-3 border-b border-zinc-900 mb-4 flex items-center gap-1.5">
             <PlusCircle className="w-4.5 h-4.5 text-blue-400" /> Insérer un Exercice Professionnel
           </h3>
+
+          {adminNotification && (
+            <div className="p-3 text-[10px] bg-emerald-950/30 text-emerald-400 border border-emerald-900/40 rounded-xl mb-4 animate-fadeIn">
+              {adminNotification}
+            </div>
+          )}
 
           <form onSubmit={handleAddExercise} className="space-y-3 font-mono text-xs">
             <div>
