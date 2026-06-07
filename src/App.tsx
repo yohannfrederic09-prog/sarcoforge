@@ -38,7 +38,9 @@ import {
   Loader2,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  Menu,
+  X
 } from "lucide-react";
 
 export default function App() {
@@ -86,6 +88,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>(() => {
     return localStorage.getItem("sarcoforge_activeTab") || "onboarding";
   });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(() => {
     return localStorage.getItem("sarcoforge_onboardingCompleted") === "true";
   });
@@ -652,8 +655,22 @@ export default function App() {
       )}
 
       {/* Header Bar */}
-      <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-40 px-6 h-16 flex items-center justify-between">
+      <header className="border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-45 px-4 md:px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
+          {/* Mobile hamburger menu toggle */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 -ml-2 rounded-xl bg-zinc-900/30 border border-zinc-900/55 hover:bg-zinc-900 text-zinc-400 hover:text-white transition-all md:hidden cursor-pointer"
+            title="Menu global"
+            id="mobile-drawer-toggle"
+          >
+            {isMobileMenuOpen ? (
+              <X className="w-5 h-5 text-red-400 animate-fadeIn" />
+            ) : (
+              <Menu className="w-5 h-5 text-white" />
+            )}
+          </button>
+
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-[0_0_12px_rgba(59,130,246,0.35)]">
             <Dumbbell className="w-4.5 h-4.5 text-white" />
           </div>
@@ -737,8 +754,8 @@ export default function App() {
 
       {/* Main workspace (Sidebar + viewport container) */}
       <div className="flex-1 flex flex-col md:flex-row relative">
-        {/* Navigation panel Sidebar */}
-        <aside className="w-full md:w-64 border-r border-zinc-900 bg-[#0a0a0c] p-4 flex flex-col gap-1 shrink-0">
+        {/* Navigation panel Sidebar (Desktop/Tablet Only) */}
+        <aside className="hidden md:flex w-full md:w-64 border-r border-zinc-900 bg-[#0a0a0c] p-4 flex-col gap-1 shrink-0">
           <span className="text-[9px] font-mono text-zinc-650 uppercase tracking-widest px-3 mb-2.5 block">ESPACE ATHLÈTE</span>
 
           <button
@@ -951,8 +968,251 @@ export default function App() {
           )}
         </aside>
 
-        {/* Viewport content layout */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6">
+        {/* Mobile Sliding Drawer Backdrop overlay */}
+        <div 
+          className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-300 md:hidden ${
+            isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          }`}
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+
+        {/* Mobile Sliding Drawer Sidebar Sheet */}
+        <aside 
+          className={`fixed top-16 left-0 bottom-0 w-72 bg-[#09090b] border-r border-zinc-900 px-4 py-6 flex flex-col gap-1 z-45 md:hidden transition-transform duration-300 transform overflow-y-auto pb-28 ${
+            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <span className="text-[9px] font-mono text-zinc-650 uppercase tracking-widest px-3 mb-2.5 block">ESPACE ATHLÈTE</span>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              if (onboardingCompleted) setActiveTab("dashboard");
+              else setActiveTab("onboarding");
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "onboarding" || activeTab === "dashboard"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Diagnostics & IA Plan</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              setActiveTab("account");
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "account"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            }`}
+          >
+            <User className="w-4 h-4" />
+            <span>Mon Compte Cloud</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              if (onboardingCompleted) setActiveTab("workouts");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Veuillez compléter votre diagnostic d'onboarder biométrique ('Diagnostics & IA Plan') afin de déverrouiller le suivi intelligent de vos séances.",
+                  type: "info"
+                });
+              }
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "workouts"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
+          >
+            <Dumbbell className="w-4 h-4" />
+            <span>Suivi d'Entraînement</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              if (onboardingCompleted) setActiveTab("coach");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Le module Coach IA Ultra Avancé a besoin de calibrer vos données physiologiques avant de lancer l'analyse biomécanique en temps réel. Complétez votre onboarding !",
+                  type: "info"
+                });
+              }
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "coach"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>Coach IA Ultra Avancé</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              if (onboardingCompleted) setActiveTab("nutrition");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "L'indice d'absorption moléculaire, le plan nutritionnel et l'accès à la base d'aliments de pointe requièrent l'évaluation initiale d'onboarding.",
+                  type: "info"
+                });
+              }
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "nutrition"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
+          >
+            <Utensils className="w-4 h-4" />
+            <span>Nutrition & Tracker</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              if (onboardingCompleted) setActiveTab("analytics");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Les graphiques prévisionnels et l'analyseur de tonnages attendent l'évaluation biométrique pour commencer à modéliser vos projections de force.",
+                  type: "info"
+                });
+              }
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "analytics"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Analyses & Projections</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              if (onboardingCompleted) setActiveTab("community");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Pour préserver la qualité de la communauté d'élite, vous devez valider vos calibrages biométriques de départ. Rejoignez la forge !",
+                  type: "info"
+                });
+              }
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "community"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Club Communauté</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              if (onboardingCompleted) setActiveTab("gamification");
+              else {
+                showModal({
+                  title: "Accès Restreint - Diagnostic Requis",
+                  message: "Votre feuille de personnage de force (Feuille d'Athlète RPG) et le suivi des quêtes de tonnage s'activent après complétion du diagnostic.",
+                  type: "info"
+                });
+              }
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "gamification"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            } ${!onboardingCompleted ? "opacity-60" : ""}`}
+          >
+            <Trophy className="w-4 h-4" />
+            <span>Quêtes & Défis RPG</span>
+          </button>
+
+          <span className="text-[9px] font-mono text-zinc-650 uppercase tracking-widest px-3 mt-6 mb-2.5 block">SYSTÈME ET TECH</span>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              setActiveTab("admin");
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "admin"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            <span>Back Office Admin</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              setActiveTab("devops");
+            }}
+            className={`w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer ${
+              activeTab === "devops"
+                ? "bg-gradient-to-r from-blue-600/10 to-indigo-600/10 text-blue-400 border border-blue-500/15"
+                : "text-zinc-400 hover:text-white border border-transparent"
+            }`}
+          >
+            <Terminal className="w-4 h-4" />
+            <span>Architect Console</span>
+          </button>
+
+          {/* Reset button to clear onboarding memory */}
+          {onboardingCompleted && (
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                showModal({
+                  title: "Réinitialisation Algorithmique",
+                  message: "Attention, cette action est irréversible. Tout l'historique de votre biométrie, vos repas, vos quêtes actives, et vos séances seront définitivement détruits du stockage local.",
+                  type: "confirm",
+                  confirmText: "Tout effacer",
+                  cancelText: "Conserver",
+                  onConfirm: () => {
+                    setOnboardingCompleted(false);
+                    setOnboardingData(null);
+                    setActiveTab("onboarding");
+                    setLevel(1);
+                    setXp(350);
+                    localStorage.removeItem("sarcoforge_onboardingCompleted");
+                    localStorage.removeItem("sarcoforge_onboardingData");
+                    localStorage.removeItem("sarcoforge_sessions");
+                    localStorage.removeItem("sarcoforge_logged_meals");
+                  }
+                });
+              }}
+              className="mt-6 w-full text-left py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 text-red-500 hover:bg-red-500/5 hover:text-red-400 transition-all border border-transparent cursor-pointer"
+            >
+              <LogOut className="w-4 h-4 text-red-500" />
+              <span>Réinitialiser Diagnos</span>
+            </button>
+          )}
+        </aside>
+
+        {/* Viewport content layout - snubbier padding on mobile/tablet */}
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-6 pb-24 md:pb-8">
           {/* Onboarding Wizard view */}
           {activeTab === "onboarding" && !onboardingCompleted && (
             <div className="space-y-6">
@@ -1157,7 +1417,7 @@ export default function App() {
       </div>
 
       {/* Humble professional UI footer */}
-      <footer className="border-t border-zinc-950 bg-[#060608] py-5 px-6 flex flex-col md:flex-row justify-between items-center text-[10px] text-zinc-600 font-mono mt-auto gap-3.5">
+      <footer className="border-t border-zinc-950 bg-[#060608] py-5 px-6 flex flex-col md:flex-row justify-between items-center text-[10px] text-zinc-600 font-mono mt-auto gap-3.5 pb-24 md:pb-5">
         <span>© 2026 SarcoForge AI Fitness Platform. Tous droits réservés.</span>
         <div className="flex gap-4">
           <span>SaaS Edition: Production-v1.2</span>
@@ -1165,6 +1425,106 @@ export default function App() {
           <span>Database status: Connected postgresql</span>
         </div>
       </footer>
+
+      {/* Mobile Sticky Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#08080a]/95 border-t border-zinc-900/90 backdrop-blur-md flex items-center justify-around px-2 z-40 md:hidden pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.6)]">
+        <button
+          onClick={() => {
+            setIsMobileMenuOpen(false);
+            if (onboardingCompleted) setActiveTab("dashboard");
+            else setActiveTab("onboarding");
+          }}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 text-center transition-all cursor-pointer ${
+            activeTab === "onboarding" || activeTab === "dashboard"
+              ? "text-blue-400 font-bold"
+              : "text-zinc-400 hover:text-zinc-300"
+          }`}
+        >
+          <Sparkles className="w-5 h-5" />
+          <span className="text-[9px] font-semibold tracking-tight">Diagnostics</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setIsMobileMenuOpen(false);
+            if (onboardingCompleted) setActiveTab("workouts");
+            else {
+              showModal({
+                title: "Accès Restreint",
+                message: "Veuillez compléter votre diagnostic d'onboarder biométrique d'abord.",
+                type: "info"
+              });
+            }
+          }}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 text-center transition-all cursor-pointer ${
+            activeTab === "workouts"
+              ? "text-blue-400 font-bold"
+              : "text-zinc-400 hover:text-zinc-350"
+          } ${!onboardingCompleted ? "opacity-50" : ""}`}
+        >
+          <Dumbbell className="w-5 h-5" />
+          <span className="text-[9px] font-semibold tracking-tight">Séances</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setIsMobileMenuOpen(false);
+            if (onboardingCompleted) setActiveTab("coach");
+            else {
+              showModal({
+                title: "Accès Restreint",
+                message: "Veuillez compléter votre diagnostic d'onboarder biométrique d'abord.",
+                type: "info"
+              });
+            }
+          }}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 text-center transition-all cursor-pointer ${
+            activeTab === "coach"
+              ? "text-blue-400 font-bold"
+              : "text-zinc-400 hover:text-zinc-350"
+          } ${!onboardingCompleted ? "opacity-50" : ""}`}
+        >
+          <MessageSquare className="w-5 h-5 flex-shrink-0" />
+          <span className="text-[9px] font-semibold tracking-tight">Coach IA</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setIsMobileMenuOpen(false);
+            if (onboardingCompleted) setActiveTab("nutrition");
+            else {
+              showModal({
+                title: "Accès Restreint",
+                message: "Veuillez compléter votre diagnostic d'onboarder biométrique d'abord.",
+                type: "info"
+              });
+            }
+          }}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 text-center transition-all cursor-pointer ${
+            activeTab === "nutrition"
+              ? "text-blue-400 font-bold"
+              : "text-zinc-400 hover:text-zinc-350"
+          } ${!onboardingCompleted ? "opacity-50" : ""}`}
+        >
+          <Utensils className="w-5 h-5" />
+          <span className="text-[9px] font-semibold tracking-tight">Nutrition</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setIsMobileMenuOpen(false);
+            setActiveTab("account");
+          }}
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-1 text-center transition-all cursor-pointer ${
+            activeTab === "account"
+              ? "text-blue-400 font-bold"
+              : "text-zinc-400 hover:text-zinc-300"
+          }`}
+        >
+          <User className="w-5 h-5" />
+          <span className="text-[9px] font-semibold tracking-tight">Mon Compte</span>
+        </button>
+      </nav>
 
       {/* Futuristic Cybernetic Dialog Systems overlay */}
       <CyberModal
